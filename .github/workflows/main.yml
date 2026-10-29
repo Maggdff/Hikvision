@@ -1,0 +1,38 @@
+name: Build APK from ZIP
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: فك ملف المشروع المضغوط
+        run: |
+          ZIP=$(ls *.zip | head -1)
+          echo "ملف المشروع: $ZIP"
+          unzip -q "$ZIP" -d src_unzipped
+          # المشروع داخل مجلد واحد (SmartWaterMonitor)
+          DIR=$(find src_unzipped -name gradlew -maxdepth 3 -printf '%h\n' | head -1)
+          echo "جذر المشروع: $DIR"
+          echo "PROJECT_DIR=$DIR" >> "$GITHUB_ENV"
+          ls "$DIR/app/libs" "$DIR/app/src/main/jniLibs/armeabi-v7a" | head -30
+
+      - name: بناء Debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SmartWaterMonitor-debug-apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
