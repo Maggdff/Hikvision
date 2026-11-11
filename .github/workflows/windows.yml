@@ -1,0 +1,25 @@
+name: windows-build
+on:
+  push:
+    paths: ['SmartWaterMonitor.Windows/**', '.github/workflows/windows.yml']
+  workflow_dispatch:
+jobs:
+  build-test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: SmartWaterMonitor.Windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build Engine (OpenCvSharp)
+        run: dotnet build src/SmartWater.Engine/SmartWater.Engine.csproj -c Release
+      - name: Test Core
+        run: dotnet test tests/SmartWater.Tests/SmartWater.Tests.csproj -c Release --logger "trx;LogFileName=results.trx"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: SmartWaterMonitor.Windows/tests/SmartWater.Tests/TestResults/*.trx
