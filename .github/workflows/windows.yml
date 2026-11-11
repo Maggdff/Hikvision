@@ -1,25 +1,33 @@
 name: windows-build
 on:
   push:
-    paths: ['SmartWaterMonitor.Windows/**', '.github/workflows/windows.yml']
   workflow_dispatch:
 jobs:
   build-test:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: SmartWaterMonitor.Windows
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      # يجد مجلد المشروع أينما وُضع في المستودع (جذر المستودع أو مجلد فرعي)
+      - name: Locate solution folder
+        id: loc
+        shell: pwsh
+        run: |
+          $p = Get-ChildItem -Recurse -Filter SmartWater.Tests.csproj | Select-Object -First 1
+          if (-not $p) { Write-Error "SmartWater.Tests.csproj not found"; exit 1 }
+          $root = $p.Directory.Parent.Parent.FullName
+          Write-Host "Solution root: $root"
+          "root=$root" >> $env:GITHUB_OUTPUT
       - name: Build Engine (OpenCvSharp)
+        working-directory: ${{ steps.loc.outputs.root }}
         run: dotnet build src/SmartWater.Engine/SmartWater.Engine.csproj -c Release
-      - name: Test Core
+      - name: Test Core and Licensing
+        working-directory: ${{ steps.loc.outputs.root }}
         run: dotnet test tests/SmartWater.Tests/SmartWater.Tests.csproj -c Release --logger "trx;LogFileName=results.trx"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: SmartWaterMonitor.Windows/tests/SmartWater.Tests/TestResults/*.trx
+          path: ${{ steps.loc.outputs.root }}/tests/SmartWater.Tests/TestResults/*.trx
