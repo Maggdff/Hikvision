@@ -11,15 +11,16 @@ public sealed class IsapiSnapshotClient : IDisposable
     private readonly HttpClient _http;
     private readonly Uri _baseUri;
 
-    public IsapiSnapshotClient(string host, int port, string user, string password, bool https = false, TimeSpan? timeout = null)
+    public IsapiSnapshotClient(string host, int port, string user, string password, bool https = false, TimeSpan? timeout = null, HttpMessageHandler? handler = null)
     {
         _baseUri = new Uri($"{(https ? "https" : "http")}://{host}:{port}/");
         var cache = new CredentialCache();
         var cred = new NetworkCredential(user, password);
         cache.Add(_baseUri, "Digest", cred);
         cache.Add(_baseUri, "Basic", cred);
-        var handler = new HttpClientHandler { Credentials = cache, PreAuthenticate = false };
-        _http = new HttpClient(handler) { Timeout = timeout ?? TimeSpan.FromSeconds(8) };
+        _http = handler != null
+            ? new HttpClient(handler, disposeHandler: false) { Timeout = timeout ?? TimeSpan.FromSeconds(8) }       // للاختبارات
+            : new HttpClient(new HttpClientHandler { Credentials = cache, PreAuthenticate = false }) { Timeout = timeout ?? TimeSpan.FromSeconds(8) };
     }
 
     public string LastError { get; private set; } = "";

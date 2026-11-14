@@ -32,3 +32,20 @@ public static class ImageConv
         return (g, w, h);
     }
 }
+
+public static class ImageIo
+{
+    /// <summary>فك JPEG إلى Mat ملوّن (BGR) بتصغير بقوى 2 يقرّب العرض إلى maxW (كما inSampleSize في أندرويد). null إن تعذّر.</summary>
+    public static Mat? DecodeScaled(byte[] bytes, int maxW)
+    {
+        var m = Cv2.ImDecode(bytes, ImreadModes.Color);
+        if (m.Empty()) { m.Dispose(); return null; }
+        int s = 1;
+        while (m.Cols / (s * 2) >= maxW) s *= 2;
+        if (s == 1) return m;
+        var r = new Mat();
+        Cv2.Resize(m, r, new Size(m.Cols / s, m.Rows / s), 0, 0, InterpolationFlags.Area);
+        m.Dispose();
+        return r;
+    }
+}

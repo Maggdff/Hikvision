@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>SmartWaterMonitor</AssemblyName>
+    <RootNamespace>SmartWater.App</RootNamespace>
+    <Platforms>AnyCPU</Platforms>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- نستعمل WinForms للأيقونة فقط؛ نزيل الـusing الضمني كي لا تتعارض أسماء WPF -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SmartWater.Core\SmartWater.Core.csproj" />
+    <ProjectReference Include="..\SmartWater.Data\SmartWater.Data.csproj" />
+    <ProjectReference Include="..\SmartWater.Engine\SmartWater.Engine.csproj" />
+    <ProjectReference Include="..\SmartWater.Licensing\SmartWater.Licensing.csproj" />
+    <ProjectReference Include="..\SmartWater.Ebs\SmartWater.Ebs.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\SmartWater.Core\SmartWater.Core.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SmartWater.Ebs" />
+  </ItemGroup>
+</Project>

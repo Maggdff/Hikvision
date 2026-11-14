@@ -8,6 +8,7 @@ public sealed class Pipeline
 {
     private readonly IReadOnlyList<MeterConfig> _meters;
     private readonly Action<double, IReadOnlyList<MeterSample>> _sink;
+    public IReadOnlyList<MeterConfig> Meters => _meters;
     public IReadOnlyList<MeterTracker> Trackers { get; }
     public IReadOnlyList<MeterSample> Samples { get; private set; } = Array.Empty<MeterSample>();
     public int Frames { get; private set; }

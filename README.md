@@ -1,25 +1,51 @@
-# Smart Water Monitor — نسخة Windows (.NET 8)
+# مراقب المياه — نسخة ويندوز (.NET 8 / WPF)
 
-المرحلة 1 + الترخيص (من 3). المستودع الأصلي (أندرويد) لم يُلمس.
+برنامج يعمل في شريط المهام 24 ساعة: يقرأ عدّادات المياه من كاميرا Hikvision بالرؤية الحاسوبية (لقطات ISAPI)،
+يتعرّف على الوايت من قناة الوايتات، يسجّل الزفات في SQLite، ويزامن الفواتير مع EBS عند الطلب.
+نقلٌ مباشر لنسخة أندرويد (Kotlin) مع الحفاظ على الخوارزميات والمخطط.
 
-| المشروع | المحتوى | الحالة |
-|---|---|---|
-| `src/SmartWater.Core` | نقل حرفي لـ `GrayFrame` / `HandProfile` / `ShakeCompensator` / `MeterTracker` / `SwingEngine` / `FillSession` | مكتوب، لم يُبنَ بعد |
-| `src/SmartWater.Engine` | `Roi` + `Pipeline` (OpenCvSharp) + لقطات ISAPI (`IsapiSnapshotClient`, `SnapshotFrameSource`) | مكتوب، لم يُجرَّب مع كاميرا |
-| `src/SmartWater.Licensing` | الترخيص: `LicenseCodec` / `LicenseGate` / `TrustedClock` / `LicenseKeeper` / `LicenseApi` (Firebase REST) / `LicenseManager` | مكتوب، لم يُبنَ بعد |
-| `tests/SmartWater.Tests` | اختبارات xUnit على بيانات اصطناعية | مكتوب، لم يُشغَّل بعد |
+> **حالة الكود**: كُتب دون إمكانية البناء في بيئة التطوير. الاختبارات والبناء يجريها GitHub Actions
+> (`.github/workflows/windows.yml`). لم يُجرَّب مع كاميرا Hikvision حقيقية ولا مع خادم EBS الحقيقي.
 
-## التشغيل
-```
-dotnet test tests/SmartWater.Tests/SmartWater.Tests.csproj
-```
-أو ادفع المجلد `SmartWaterMonitor.Windows` إلى مستودعك، وانسخ `windows.yml` إلى `.github/workflows/` في **جذر** المستودع (GitHub لا يقرأ workflows من مجلد فرعي)؛ يبني Engine ويشغّل الاختبارات.
+## المشاريع
+| المشروع | المحتوى |
+|---|---|
+| `src/SmartWater.Core` | نواة القياس: `MeterTracker`, `SwingEngine`, `FillSession`, `TruckPresence`, `TruckMatcher` (بلا اعتماد على OpenCV أو الواجهة) |
+| `src/SmartWater.Data` | `SwingDb` (الزفات) و`TruckDb` (الوايتات) — SQLite بنفس مخطط أندرويد |
+| `src/SmartWater.Engine` | OpenCvSharp + لقطات ISAPI + `Pipeline` + `TruckCoordinator` + `LiveFill` + `MonitorEngine` + الإعدادات |
+| `src/SmartWater.Licensing` | الترخيص (نفس صيغة لوحة المطوّر ومسارات Firebase) + ساعة موثوقة |
+| `src/SmartWater.Ebs` | تحميل عملاء EBS وأرصدتهم + طابور فواتير ومزامنة (Master ثم Details) |
+| `src/SmartWater.App` | تطبيق WPF عربي + أيقونة شريط المهام + المراقبة الذاتية |
+| `tests/SmartWater.Tests` | اختبارات xUnit (ببيانات اصطناعية ولقطات حقيقية للقناة 7 وكاميرا وهمية) |
 
-## المراحل القادمة
-2. نقل `TruckMatcher` / `TruckPresence` / SQLite (`Store`, `TruckDb`, `SwingDb`) وربط `MonitorEngine`.
-3. خدمة ويندوز (Worker Service) + واجهة WPF عربية (RTL) تستعمل `LicenseManager`.
+## الحصول على البرنامج
+1. ادفع المجلد إلى GitHub وانسخ `windows.yml` إلى `.github/workflows/` في **جذر** المستودع.
+2. شغّل الـ workflow (Actions → windows-build → Run workflow).
+3. نزّل من Artifacts: `SmartWaterMonitor-win-x64` (برنامج جاهز لا يحتاج تثبيت .NET) و`test-results` (ملف `results.trx`).
+4. شغّل `SmartWaterMonitor.exe`.
 
-## الترخيص
-نفس صيغة المستند ومسارات Firebase (`swm/lic`, `swm/bind`) كنسخة أندرويد، فتعمل `devconsole/swm-license-console.html` كما هي: المفاتيح نفسها تفعّل نسخة ويندوز أيضاً، وكل كمبيوتر يُحسب «جهازاً» ضمن حد الأجهزة. الخدمة تتحقق كل 20 دقيقة كحد أدنى، وعند الحجب تتوقف عن الاتصال بالكاميرا والعدّ ويبقى السجل. القيمة `LicenseOptions.Required=false` لبناء التطوير الداخلي.
+أو محليًا: `dotnet test tests/SmartWater.Tests` ثم `dotnet run --project src/SmartWater.App`.
 
-**لم يُنقل فحص بصمة التوقيع** (`Integrity.kt`): لا مقابل مباشر له في .NET، وملفات .NET يسهل فكها. الحماية هنا تمنع الاستخدام العادي وتطبّق التعليق والانتهاء فقط. لرفع الكلفة لاحقاً: توقيع Authenticode للملف التنفيذي + تشويش الشيفرة (obfuscation) + إبقاء المستودع خاصاً.
+## أول تشغيل (بهذا الترتيب)
+1. **الترخيص**: تبويب «الترخيص» ← أدخل المفتاح ← تفعيل. (للتطوير الداخلي فقط: متغير البيئة `SWM_DEV=1` يعطّل شرط الترخيص.)
+2. **الإعدادات**: عنوان الكاميرا/المسجّل والمستخدم وكلمة المرور والقنوات (العدّادات = 4، الوايتات = 7) ← حفظ.
+3. **المعايرة**: شغّل المراقبة ← «التقاط من البث» ← انقر مركز محور عقرب كل عدّاد وضبط نصف القطر ← حفظ.
+4. **الوايتات**: أضف كل وايت بالاسم **كما هو اسم العميل في EBS** وكميته المعتمدة بالبراميل.
+5. **EBS** (اختياري): أدخل بيانات الاتصال والأرقام (رقم الفرع/المستخدم الرقميين، سعر البرميل) ← «اختبار الدخول» ← «تحميل العملاء».
+6. اترك البرنامج يعمل. إغلاق النافذة يخفيها إلى شريط المهام؛ «خروج» من قائمة الأيقونة فقط يوقفه.
+   فعّل «تشغيل تلقائي عند دخول ويندوز» من الإعدادات ليعمل 24 ساعة بعد إعادة التشغيل.
+
+## الكميات والفواتير
+- الكمية المعتمدة للوايت (مثل 55) هي ما يُسجَّل للزفة وما يُفوتَر؛ الكمية المقاسة تُحفظ منفصلة ولا يُحسب خصم إضافي.
+- فاتورة EBS = الكمية المعتمدة × «سعر البرميل الافتراضي». لا مزامنة تلقائية: تُرسَل الفواتير بضغطك فقط
+  («إضافة الزفات المؤهلة للطابور» ثم «مزامنة الكل بالترتيب»). تحذير «سجل مكرر» يتوقف عنده البرنامج ليؤكده المستخدم.
+
+## الملفات والسجلات
+كل البيانات في `%LocalAppData%\SmartWaterMonitor`:
+`config.json`, `swings.db`, `trucks.db`, `ebs.db`, `license.json`, `ebs-settings.bin` (DPAPI), `truck_snaps\`, `logs\yyyy-MM-dd.log`.
+النسخ الاحتياطي: انسخ المجلد كاملًا والبرنامج متوقف.
+
+## ما لم يُنقل
+- `DiagRecorder` (تسجيل التشخيص).
+- فحص بصمة التوقيع (`Integrity.kt`) — لا مقابل مباشر في .NET؛ يُنصح بتوقيع الملف التنفيذي وتشويش الشيفرة.
+- نظام صناديق الحنفيات (ESP32/NFC): مرحلة منفصلة تنتظر الموافقة على التصميم.

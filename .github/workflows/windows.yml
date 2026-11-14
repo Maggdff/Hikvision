@@ -20,14 +20,24 @@ jobs:
           $root = $p.Directory.Parent.Parent.FullName
           Write-Host "Solution root: $root"
           "root=$root" >> $env:GITHUB_OUTPUT
-      - name: Build Engine (OpenCvSharp)
-        working-directory: ${{ steps.loc.outputs.root }}
-        run: dotnet build src/SmartWater.Engine/SmartWater.Engine.csproj -c Release
-      - name: Test Core and Licensing
+      - name: Test (Core, Licensing, Data, Ebs, Engine)
         working-directory: ${{ steps.loc.outputs.root }}
         run: dotnet test tests/SmartWater.Tests/SmartWater.Tests.csproj -c Release --logger "trx;LogFileName=results.trx"
+      - name: Build WPF app
+        if: always()
+        working-directory: ${{ steps.loc.outputs.root }}
+        run: dotnet build src/SmartWater.App/SmartWater.App.csproj -c Release
+      - name: Publish self-contained win-x64
+        if: always()
+        working-directory: ${{ steps.loc.outputs.root }}
+        run: dotnet publish src/SmartWater.App/SmartWater.App.csproj -c Release -r win-x64 --self-contained true -o publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
           path: ${{ steps.loc.outputs.root }}/tests/SmartWater.Tests/TestResults/*.trx
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SmartWaterMonitor-win-x64
+          path: ${{ steps.loc.outputs.root }}/publish

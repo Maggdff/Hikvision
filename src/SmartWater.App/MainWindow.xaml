@@ -1,0 +1,211 @@
+<Window x:Class="SmartWater.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="مراقب المياه" Width="1100" Height="780" FontSize="14" FlowDirection="RightToLeft"
+        WindowStartupLocation="CenterScreen">
+  <DockPanel>
+    <Border x:Name="BannerBox" DockPanel.Dock="Top" Background="#FFF3CD" Padding="10" Visibility="Collapsed">
+      <TextBlock x:Name="BannerText" TextWrapping="Wrap" FontWeight="SemiBold"/>
+    </Border>
+    <StatusBar DockPanel.Dock="Bottom"><StatusBarItem><TextBlock x:Name="StatusText"/></StatusBarItem></StatusBar>
+    <TabControl x:Name="Tabs" Margin="6">
+
+      <!-- ===================== المراقبة ===================== -->
+      <TabItem Header="المراقبة">
+        <ScrollViewer>
+          <StackPanel Margin="18">
+            <TextBlock x:Name="FillLabel" FontSize="30" FontWeight="Bold" Text="—"/>
+            <TextBlock x:Name="FillNote" TextWrapping="Wrap" Foreground="#555" Margin="0,4,0,14"/>
+            <TextBlock x:Name="MetersText" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,12"/>
+            <TextBlock x:Name="TodayText" FontSize="16" Margin="0,0,0,12"/>
+            <TextBlock x:Name="ConnText" Margin="0,0,0,14"/>
+            <WrapPanel>
+              <Button x:Name="StartBtn" Content="بدء المراقبة" Padding="18,6" Margin="0,0,8,6" Click="StartBtn_Click"/>
+              <Button x:Name="StopBtn" Content="إيقاف المراقبة" Padding="18,6" Margin="0,0,8,6" Click="StopBtn_Click"/>
+              <Button x:Name="ResetBgBtn" Content="اعتماد خلفية قناة الوايتات (والمنطقة فارغة)" Padding="18,6" Margin="0,0,8,6" Click="ResetBgBtn_Click"/>
+            </WrapPanel>
+            <TextBlock Text="آخر زفة" FontWeight="Bold" Margin="0,16,0,4"/>
+            <TextBox x:Name="LastSwingText" IsReadOnly="True" MinHeight="100" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ===================== السجل ===================== -->
+      <TabItem Header="السجل">
+        <DockPanel Margin="8">
+          <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <CheckBox x:Name="AllDaysCheck" Content="كل الأيام" VerticalAlignment="Center" Margin="0,0,10,0" Checked="RecFilter_Changed" Unchecked="RecFilter_Changed"/>
+            <DatePicker x:Name="RecDate" Margin="0,0,10,0" SelectedDateChanged="RecDate_Changed"/>
+            <TextBlock x:Name="RecTotalText" VerticalAlignment="Center" Margin="0,0,16,0" FontWeight="Bold"/>
+            <ComboBox x:Name="RecTruckCombo" Width="220" Margin="0,0,6,0" DisplayMemberPath="Label"/>
+            <Button x:Name="AssignBtn" Content="ربط المحدد بهذا الوايت" Padding="10,4" Margin="0,0,10,0" Click="AssignBtn_Click"/>
+            <Button x:Name="ExportBtn" Content="تصدير CSV" Padding="10,4" Margin="0,0,10,0" Click="ExportBtn_Click"/>
+            <Button x:Name="RecRefreshBtn" Content="تحديث" Padding="10,4" Click="RecRefreshBtn_Click"/>
+          </WrapPanel>
+          <DataGrid x:Name="RecGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" CanUserAddRows="False">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="#" Binding="{Binding Seq}"/>
+              <DataGridTextColumn Header="التاريخ" Binding="{Binding Day}"/>
+              <DataGridTextColumn Header="النوع" Binding="{Binding Type}"/>
+              <DataGridTextColumn Header="العدّادات" Binding="{Binding Meters}"/>
+              <DataGridTextColumn Header="البدء" Binding="{Binding Start}"/>
+              <DataGridTextColumn Header="الانتهاء" Binding="{Binding End}"/>
+              <DataGridTextColumn Header="عداد 1" Binding="{Binding M1}"/>
+              <DataGridTextColumn Header="عداد 2" Binding="{Binding M2}"/>
+              <DataGridTextColumn Header="الإجمالي المسجَّل" Binding="{Binding Total}"/>
+              <DataGridTextColumn Header="المقاس" Binding="{Binding Measured}"/>
+              <DataGridTextColumn Header="الوايت" Binding="{Binding Truck}"/>
+              <DataGridTextColumn Header="EBS" Binding="{Binding EbsStatus}"/>
+              <DataGridTextColumn Header="ملاحظات" Binding="{Binding Notes}" Width="*"/>
+            </DataGrid.Columns>
+          </DataGrid>
+        </DockPanel>
+      </TabItem>
+
+      <!-- ===================== الوايتات ===================== -->
+      <TabItem Header="الوايتات">
+        <DockPanel Margin="8">
+          <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <TextBlock Text="الاسم" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <ComboBox x:Name="TruckName" IsEditable="True" Width="260" Margin="0,0,12,0"/>
+            <TextBlock Text="الكمية (براميل)" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="TruckCap" Width="80" Margin="0,0,12,0"/>
+            <Button x:Name="TruckAddBtn" Content="إضافة" Padding="12,4" Margin="0,0,6,0" Click="TruckAddBtn_Click"/>
+            <Button x:Name="TruckUpdBtn" Content="تعديل المحدد" Padding="12,4" Margin="0,0,6,0" Click="TruckUpdBtn_Click"/>
+            <Button x:Name="TruckDelBtn" Content="حذف المحدد" Padding="12,4" Click="TruckDelBtn_Click"/>
+          </WrapPanel>
+          <TextBlock DockPanel.Dock="Top" Foreground="#555" TextWrapping="Wrap" Margin="0,0,0,8"
+                     Text="الكمية هي الكمية المعتمدة التي تُسجَّل لهذا الوايت في كل زفة (كما تدخلها أنت). الاسم يجب أن يطابق اسم العميل في EBS للمزامنة."/>
+          <DataGrid x:Name="TruckGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" CanUserAddRows="False"
+                    SelectionChanged="TruckGrid_SelectionChanged">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="الاسم" Binding="{Binding Name}" Width="*"/>
+              <DataGridTextColumn Header="الكمية المعتمدة" Binding="{Binding Capacity}"/>
+              <DataGridTextColumn Header="صور التعلّم" Binding="{Binding Photos}"/>
+            </DataGrid.Columns>
+          </DataGrid>
+        </DockPanel>
+      </TabItem>
+
+      <!-- ===================== المعايرة ===================== -->
+      <TabItem Header="المعايرة">
+        <DockPanel Margin="8">
+          <StackPanel DockPanel.Dock="Right" Width="270" Margin="8,0,0,0">
+            <Button x:Name="CalCaptureBtn" Content="التقاط من البث" Padding="10,6" Margin="0,0,0,10" Click="CalCaptureBtn_Click"/>
+            <TextBlock Text="اختر العدّاد ثم انقر على مركز محور العقرب في الصورة:" TextWrapping="Wrap" Margin="0,0,0,6"/>
+            <RadioButton x:Name="CalM1" Content="العدّاد 1" IsChecked="True" Margin="0,0,0,2"/>
+            <RadioButton x:Name="CalM2" Content="العدّاد 2" Margin="0,0,0,10"/>
+            <TextBlock Text="نصف قطر قرص العدّاد (بكسل)" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+              <Button Content="−" Width="30" Click="CalRadiusMinus_Click"/>
+              <TextBox x:Name="CalRadius" Width="70" Text="60" Margin="4,0" TextAlignment="Center" TextChanged="CalRadius_TextChanged"/>
+              <Button Content="+" Width="30" Click="CalRadiusPlus_Click"/>
+            </StackPanel>
+            <TextBlock x:Name="CalInfo" TextWrapping="Wrap" Margin="0,0,0,10"/>
+            <Button x:Name="CalSaveBtn" Content="حفظ المعايرة وإعادة التشغيل" Padding="10,6" Click="CalSaveBtn_Click"/>
+          </StackPanel>
+          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" FlowDirection="LeftToRight">
+            <Canvas x:Name="CalCanvas" Background="#222" MinWidth="400" MinHeight="300" MouseLeftButtonDown="CalCanvas_MouseDown"/>
+          </ScrollViewer>
+        </DockPanel>
+      </TabItem>
+
+      <!-- ===================== الإعدادات ===================== -->
+      <TabItem Header="الإعدادات">
+        <ScrollViewer>
+          <Grid Margin="18" MaxWidth="640" HorizontalAlignment="Right">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+              <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="عنوان الكاميرا/المسجّل (IP)" Margin="0,6"/><TextBox x:Name="SetIp" Grid.Row="0" Grid.Column="1" Margin="0,4"/>
+            <TextBlock Grid.Row="1" Text="منفذ HTTP" Margin="0,6"/><TextBox x:Name="SetPort" Grid.Row="1" Grid.Column="1" Margin="0,4"/>
+            <TextBlock Grid.Row="2" Text="اسم المستخدم" Margin="0,6"/><TextBox x:Name="SetUser" Grid.Row="2" Grid.Column="1" Margin="0,4"/>
+            <TextBlock Grid.Row="3" Text="كلمة المرور" Margin="0,6"/><PasswordBox x:Name="SetPass" Grid.Row="3" Grid.Column="1" Margin="0,4"/>
+            <TextBlock Grid.Row="4" Text="قناة العدّادات" Margin="0,6"/><TextBox x:Name="SetChannel" Grid.Row="4" Grid.Column="1" Margin="0,4"/>
+            <TextBlock Grid.Row="5" Text="قناة الوايتات (0 = معطّل)" Margin="0,6"/><TextBox x:Name="SetTruckCh" Grid.Row="5" Grid.Column="1" Margin="0,4"/>
+            <TextBlock Grid.Row="6" Text="عدد العدّادات" Margin="0,6"/>
+            <ComboBox x:Name="SetMeters" Grid.Row="6" Grid.Column="1" Margin="0,4"><ComboBoxItem Content="1"/><ComboBoxItem Content="2"/></ComboBox>
+            <TextBlock Grid.Row="7" Text="براميل لكل دورة كاملة للعقرب" Margin="0,6"/><TextBox x:Name="SetBpt" Grid.Row="7" Grid.Column="1" Margin="0,4"/>
+            <TextBlock Grid.Row="8" Text="توصيل العدّادين" Margin="0,6"/>
+            <ComboBox x:Name="SetWiring" Grid.Row="8" Grid.Column="1" Margin="0,4">
+              <ComboBoxItem Content="تفرّع — ماء مختلف فيُجمعان"/><ComboBoxItem Content="تسلسل — الماء نفسه فيُؤخذ الأكبر"/>
+            </ComboBox>
+            <TextBlock Grid.Row="9" Text="منطقة الوايت x,y,w,h (٪)" Margin="0,6"/><TextBox x:Name="SetZone" Grid.Row="9" Grid.Column="1" Margin="0,4"/>
+            <CheckBox x:Name="SetAuto" Grid.Row="10" Grid.ColumnSpan="2" Content="التعرّف التلقائي على الوايت عند التأكد" Margin="0,8"/>
+            <CheckBox x:Name="SetAutoStart" Grid.Row="11" Grid.ColumnSpan="2" Content="تشغيل البرنامج تلقائيًا عند دخول ويندوز (في الخلفية)" Margin="0,8"/>
+            <Button x:Name="SetSaveBtn" Grid.Row="12" Grid.ColumnSpan="2" Content="حفظ وإعادة تشغيل المراقبة" Padding="14,6" HorizontalAlignment="Left" Margin="0,14" Click="SetSaveBtn_Click"/>
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ===================== EBS ===================== -->
+      <TabItem Header="EBS">
+        <DockPanel Margin="8">
+          <ScrollViewer DockPanel.Dock="Right" Width="360" Margin="8,0,0,0" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <TextBlock Text="إعدادات الاتصال بـ EBS" FontWeight="Bold" Margin="0,0,0,6"/>
+              <TextBlock Text="رابط الخدمة"/><TextBox x:Name="EbsUrl" Margin="0,2,0,6"/>
+              <TextBlock Text="اسم المستخدم"/><TextBox x:Name="EbsUser" Margin="0,2,0,6"/>
+              <TextBlock Text="كلمة المرور"/><PasswordBox x:Name="EbsPass" Margin="0,2,0,6"/>
+              <TextBlock Text="السنة"/><TextBox x:Name="EbsYear" Margin="0,2,0,6"/>
+              <TextBlock Text="اسم الفرع"/><TextBox x:Name="EbsBranchName" Margin="0,2,0,6"/>
+              <TextBlock Text="رقم الفرع (رقمي)"/><TextBox x:Name="EbsBranchId" Margin="0,2,0,6"/>
+              <TextBlock Text="رقم المستخدم (رقمي)"/><TextBox x:Name="EbsUserId" Margin="0,2,0,6"/>
+              <TextBlock Text="اسم الموزع للعرض (اختياري)"/><TextBox x:Name="EbsCashier" Margin="0,2,0,6"/>
+              <TextBlock Text="العملة"/><TextBox x:Name="EbsCurrency" Margin="0,2,0,6"/>
+              <TextBlock Text="نوع الدفع الافتراضي"/><TextBox x:Name="EbsPayment" Margin="0,2,0,6"/>
+              <TextBlock Text="المخزن الافتراضي"/><TextBox x:Name="EbsStore" Margin="0,2,0,6"/>
+              <TextBlock Text="وحدة الماء (مثل: برميل)"/><TextBox x:Name="EbsUnit" Margin="0,2,0,6"/>
+              <TextBlock Text="سعر البرميل الافتراضي"/><TextBox x:Name="EbsPrice" Margin="0,2,0,10"/>
+              <WrapPanel>
+                <Button x:Name="EbsSaveBtn" Content="حفظ" Padding="12,4" Margin="0,0,6,6" Click="EbsSaveBtn_Click"/>
+                <Button x:Name="EbsLoginBtn" Content="اختبار الدخول" Padding="12,4" Margin="0,0,6,6" Click="EbsLoginBtn_Click"/>
+                <Button x:Name="EbsDownloadBtn" Content="تحميل العملاء" Padding="12,4" Margin="0,0,6,6" Click="EbsDownloadBtn_Click"/>
+              </WrapPanel>
+              <TextBlock x:Name="EbsInfo" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            </StackPanel>
+          </ScrollViewer>
+          <DockPanel>
+            <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+              <Button x:Name="EbsQueueBtn" Content="إضافة الزفات المؤهلة للطابور" Padding="10,4" Margin="0,0,6,6" Click="EbsQueueBtn_Click"/>
+              <Button x:Name="EbsSyncAllBtn" Content="مزامنة الكل بالترتيب" Padding="10,4" Margin="0,0,6,6" Click="EbsSyncAllBtn_Click"/>
+              <Button x:Name="EbsSyncOneBtn" Content="مزامنة المحدد" Padding="10,4" Margin="0,0,6,6" Click="EbsSyncOneBtn_Click"/>
+              <Button x:Name="EbsConfirmBtn" Content="تأكيد «سجل مكرر» وإرسال المحدد" Padding="10,4" Margin="0,0,6,6" Click="EbsConfirmBtn_Click"/>
+              <Button x:Name="EbsRefreshBtn" Content="تحديث" Padding="10,4" Margin="0,0,6,6" Click="EbsRefreshBtn_Click"/>
+            </WrapPanel>
+            <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="#555" Margin="0,0,0,8"
+                       Text="لا مزامنة تلقائية: لا يُرسَل شيء إلى EBS إلا بضغطك. الفاتورة = الكمية المعتمدة للوايت × سعر البرميل الافتراضي."/>
+            <DataGrid x:Name="InvGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" CanUserAddRows="False">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="العميل (الوايت)" Binding="{Binding Customer}"/>
+                <DataGridTextColumn Header="البراميل" Binding="{Binding Barrels}"/>
+                <DataGridTextColumn Header="السعر" Binding="{Binding Price}"/>
+                <DataGridTextColumn Header="الإجمالي" Binding="{Binding Total}"/>
+                <DataGridTextColumn Header="الحالة" Binding="{Binding Status}"/>
+                <DataGridTextColumn Header="محاولات" Binding="{Binding Attempts}"/>
+                <DataGridTextColumn Header="الخطأ" Binding="{Binding Error}" Width="*"/>
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+        </DockPanel>
+      </TabItem>
+
+      <!-- ===================== الترخيص ===================== -->
+      <TabItem Header="الترخيص">
+        <StackPanel Margin="18" MaxWidth="560" HorizontalAlignment="Right">
+          <TextBlock Text="مفتاح التفعيل" FontWeight="Bold" Margin="0,0,0,6"/>
+          <TextBox x:Name="LicKey" FlowDirection="LeftToRight" FontFamily="Consolas" FontSize="16" Margin="0,0,0,8"/>
+          <WrapPanel Margin="0,0,0,14">
+            <Button x:Name="LicActivateBtn" Content="تفعيل" Padding="14,5" Margin="0,0,6,0" Click="LicActivateBtn_Click"/>
+            <Button x:Name="LicRefreshBtn" Content="تحقق الآن" Padding="14,5" Margin="0,0,6,0" Click="LicRefreshBtn_Click"/>
+            <Button x:Name="LicDeactivateBtn" Content="إلغاء التفعيل على هذا الجهاز" Padding="14,5" Click="LicDeactivateBtn_Click"/>
+          </WrapPanel>
+          <TextBox x:Name="LicInfo" IsReadOnly="True" TextWrapping="Wrap" MinHeight="140" VerticalScrollBarVisibility="Auto"/>
+        </StackPanel>
+      </TabItem>
+
+    </TabControl>
+  </DockPanel>
+</Window>
