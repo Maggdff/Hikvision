@@ -26,7 +26,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         RecDate.SelectedDate = DateTime.Today;
         WireEngine();
-        LoadSettingsUi(); LoadEbsUi(); RefreshLicenseUi(); LoadCalibration();
+        LoadSettingsUi(); LoadEbsUi(); RefreshLicenseUi(); LoadCalibration(); LoadGateUi();
         RefreshTrucks(); RefreshRecords(); RefreshInvoices();
         _ready = true;
         var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -77,6 +77,7 @@ public partial class MainWindow : Window
 
     private void UiTick()
     {
+        GateTick();
         var e = _s.Engine;
         ConnText.Text = !e.Running ? "المراقبة متوقفة"
             : e.Connected ? $"متصل بالكاميرا — {(_state?.Fps ?? 0).ToString("0.0", CultureInfo.InvariantCulture)} إطار/ث"

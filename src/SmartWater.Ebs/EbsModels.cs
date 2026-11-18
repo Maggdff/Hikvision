@@ -44,6 +44,10 @@ internal static class EbsJson
 
     public static string Str(JsonNode n) => n.ToJsonString(Opts);
 
+    /// <summary>النص إن كانت العقدة نصًّا فعلًا، وإلا null (بلا استثناءات من TryGetValue على أنواع غير متوافقة).</summary>
+    public static string? StringOrNull(JsonNode? n) =>
+        n is JsonValue v && v.GetValueKind() == JsonValueKind.String ? v.GetValue<string>() : null;
+
     public static JsonNode? TryParse(string s)
     {
         try { return JsonNode.Parse(s); } catch (JsonException) { return null; }
@@ -53,15 +57,15 @@ internal static class EbsJson
     public static JsonArray? AsArray(JsonNode? n)
     {
         if (n is JsonArray a) return a;
-        if (n is JsonValue v && v.TryGetValue<string>(out var s) && !string.IsNullOrWhiteSpace(s))
-            return TryParse(s) as JsonArray;
+        var s = StringOrNull(n);
+        if (!string.IsNullOrWhiteSpace(s)) return TryParse(s) as JsonArray;
         return null;
     }
 
     public static string? Text(JsonNode? n, string key)
     {
         if (n is not JsonObject o || !o.TryGetPropertyValue(key, out var v) || v == null) return null;
-        return v is JsonValue jv && jv.TryGetValue<string>(out var s) ? s : v.ToString();
+        return StringOrNull(v) ?? v.ToString();
     }
 
     public static double Num(JsonNode? n, string key)
@@ -89,14 +93,14 @@ internal static class EbsJson
                 foreach (var k in new[] { "ID", "Id", "id" })
                 {
                     if (!o.TryGetPropertyValue(k, out var v) || v == null) continue;
-                    var t = v is JsonValue jv && jv.TryGetValue<string>(out var s) ? s : v.ToString();
+                    var t = StringOrNull(v) ?? v.ToString();
                     if (long.TryParse(t, out var id) && id != 0) return id;
                 }
                 return null;
             case JsonArray a: return a.Count > 0 ? IdFrom(a[0]) : null;
-            case JsonValue v when v.TryGetValue<string>(out var str):
-                str = str.Trim();
-                if (str.StartsWith("[") || str.StartsWith("{")) return IdFrom(TryParse(str));
+            case JsonValue:
+                var str = StringOrNull(e)?.Trim();
+                if (str != null && (str.StartsWith("[") || str.StartsWith("{"))) return IdFrom(TryParse(str));
                 return null;
             default: return null;
         }

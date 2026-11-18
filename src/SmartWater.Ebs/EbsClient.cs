@@ -59,7 +59,9 @@ public sealed class EbsClient
                 return new EbsLoginResult(false, HttpStatusCode: 200, RawResponse: text, ErrorMessage: $"EBS code {ebsCode}: {msg}");
             if (root["ResultBody"] == null)
                 return new EbsLoginResult(false, HttpStatusCode: 200, RawResponse: text, ErrorMessage: "لا يوجد بيانات بالرد (ResultBody فارغ)");
-            var body = root["ResultBody"] is JsonValue v && v.TryGetValue<string>(out var str) ? EbsJson.TryParse(str) : root["ResultBody"];
+            var rb = root["ResultBody"];
+            var rbText = EbsJson.StringOrNull(rb);
+            var body = rbText != null ? EbsJson.TryParse(rbText) : rb;
             var sid = EbsJson.Text(body, "ID");
             CurrentSessionId = sid;
             return new EbsLoginResult(!string.IsNullOrEmpty(sid), sid, EbsJson.Text(body, "FullName"), text, null, 200)
@@ -98,6 +100,28 @@ public sealed class EbsClient
         {
             ["FormName"] = formName, ["OpType"] = opType, ["Condition"] = "", ["IgnoreBranchCondition"] = true, ["TestDate"] = false,
             ["TransactionID"] = transactionId, ["SessionID"] = SessionForWire(), ["TheRowJson"] = EbsJson.Str(arr),
+        };
+        return Safe(() => Post("Window_OperationsAndroid", op, ct), ct);
+    }
+
+    /// <summary>
+    /// قراءة رصيد حساب حيًّا بالاسم (One_Account): نقل لـ readAccountBalance في التطبيق الأصلي (استُعمل هناك لحساب الصندوق).
+    /// لم يُتحقق منه على حسابات العملاء؛ الأعمدة المقروءة: Madeen/Dain/CurrencyName/BalanceState.
+    /// </summary>
+    public Task<EbsOperationResult> ReadAccountBalanceAsync(string accountName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(CurrentSessionId)) throw new InvalidOperationException("غير مسجَّل دخول — استدعِ LoginAsync أولًا.");
+        string today = DateTime.Now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        JsonArray Args() => new()
+        {
+            "حتى يوم", today, today, "", "المدين والدائن", "كافة العملات إجمالي", accountName, "كافة المستندات", "", "إختيار مخصص",
+            false, false, false, false, false, false, false, false, true, false, true, false, "",
+        };
+        var op = new JsonObject
+        {
+            ["Condition"] = "", ["FormName"] = "EBS.Mobile.Distribution.wndBillAccount_BeforeRelay", ["IgnoreBranchCondition"] = false,
+            ["Method"] = new JsonObject { ["Args"] = Args(), ["Name"] = "One_Account", ["_Args"] = Args() },
+            ["OpType"] = 4, ["SessionID"] = SessionForWire(), ["TestDate"] = false, ["TheRowJson"] = "[]", ["TransactionID"] = 0,
         };
         return Safe(() => Post("Window_OperationsAndroid", op, ct), ct);
     }

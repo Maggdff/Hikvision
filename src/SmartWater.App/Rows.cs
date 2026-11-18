@@ -10,6 +10,11 @@ public sealed record TruckRow(long Id, string Name, string Capacity, int Photos,
 
 public sealed record TruckChoice(long Id, string Label);
 
+public sealed record BoxRow(int Id, string Name, int Station, int Tap, int Meter, string Device, bool Enabled, string Online, string Lock, string Reader, string Operation);
+public sealed record CardRow(long Id, string Label, string Driver, string Truck, string Status);
+public sealed record GateEventRow(long Id, string Time, string Kind, string Box, string Data);
+public sealed record IdChoice(int Id, string Label);
+
 public sealed record InvRow(string LocalId, string Customer, string Barrels, string Price, string Total, string Status, int Attempts, string Error);
 
 public static class Ui

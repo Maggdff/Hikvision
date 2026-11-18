@@ -42,6 +42,8 @@ public partial class App : Application
             else _tray.Balloon("يعمل في الخلفية — انقر الأيقونة لفتح النافذة");
 
             _svc.StartMonitoring();                                  // يبدأ تلقائيًا إن كان الترخيص صالحًا
+            if (_svc.GateSettings.Enabled)
+                _ = _svc.StartGateAsync().ContinueWith(t => { if (t.Result != null) Dispatcher.BeginInvoke(new Action(() => _tray?.Balloon("تعذّر تشغيل الجسر: " + t.Result))); });
             _tick = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
             _tick.Tick += async (_, _) => { await _svc.TickAsync(); _tray?.SetTooltip(_win.TooltipText()); };
             _tick.Start();

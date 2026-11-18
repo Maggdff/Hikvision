@@ -115,7 +115,7 @@ public class EbsFlowTests
     {
         var (_, c, f) = Make();
         var ok = await c.LoginAsync(S);
-        Assert.True(ok.Success); Assert.Equal("22795", ok.SessionId); Assert.Equal("موزع", ok.DistributorName);
+        Assert.True(ok.Success, ok.ErrorMessage + " | " + ok.RawResponse); Assert.Equal("22795", ok.SessionId); Assert.Equal("موزع", ok.DistributorName);
         f.FailLogin = true;
         var bad = await new EbsClient(S, new HttpClient(f)).LoginAsync(S);
         Assert.False(bad.Success); Assert.Contains("EBS code 401", bad.ErrorMessage);

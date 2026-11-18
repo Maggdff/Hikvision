@@ -38,6 +38,40 @@ public sealed class EbsDb : IDisposable
         }
     }
 
+    private void EnsureMeta() => Sql.Exec(_db, "CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT)");
+
+    /// <summary>وقت آخر تحميل ناجح لأرصدة العملاء (ms)، أو 0.</summary>
+    public long BalancesUpdatedMs()
+    {
+        lock (_lock)
+        {
+            EnsureMeta();
+            var v = Sql.Query(_db, "SELECT v FROM meta WHERE k='balances_ms'", r => r.GetString(0));
+            return v.Count > 0 && long.TryParse(v[0], out var ms) ? ms : 0L;
+        }
+    }
+
+    public long? CurrencyId(string name)
+    {
+        lock (_lock)
+        {
+            var l = Sql.Query(_db, "SELECT id FROM currencies WHERE name=@n COLLATE NOCASE", r => r.GetInt64(0), ("@n", Norm(name)));
+            return l.Count > 0 ? l[0] : null;
+        }
+    }
+
+    /// <summary>رصيد دائن/مدين (موجب = له رصيد) من اللقطة المحمَّلة لعملة محددة، أو null إن لم يوجد صف.</summary>
+    public double? SnapshotCredit(long accountId, long? currencyId)
+    {
+        lock (_lock)
+        {
+            var rows = Sql.Query(_db, "SELECT currency_id, amount FROM customer_balances WHERE account_id=@a", r => (r.GetInt64(0), r.GetDouble(1)), ("@a", accountId));
+            if (rows.Count == 0) return null;
+            if (currencyId != null) { foreach (var (c, a) in rows) if (c == currencyId) return a; return null; }
+            return rows[0].Item2;
+        }
+    }
+
     public static string Norm(string? s) => System.Text.RegularExpressions.Regex.Replace((s ?? "").Trim(), @"\s+", " ");
 
     // ---------------- نسخة العملاء (تُستبدل بالكامل عند كل تحميل ناجح)
@@ -68,6 +102,8 @@ public sealed class EbsDb : IDisposable
                 Sql.Exec(_db, "DELETE FROM customer_balances");
                 foreach (var b in list)
                     Sql.Exec(_db, "INSERT OR REPLACE INTO customer_balances(account_id,amount,currency_id) VALUES(@a,@m,@c)", ("@a", b.AccountId), ("@m", b.Amount), ("@c", b.CurrencyId));
+                EnsureMeta();
+                Sql.Exec(_db, "INSERT OR REPLACE INTO meta(k,v) VALUES('balances_ms', @v)", ("@v", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString()));
                 Sql.Exec(_db, "COMMIT");
             }
             catch { Sql.Exec(_db, "ROLLBACK"); throw; }

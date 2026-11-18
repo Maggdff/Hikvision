@@ -192,6 +192,123 @@
         </DockPanel>
       </TabItem>
 
+      <!-- ===================== الصناديق (WaterGateBridge) ===================== -->
+      <TabItem x:Name="GateTab" Header="الصناديق">
+        <TabControl Margin="4">
+
+          <TabItem Header="الصناديق والمحطات">
+            <DockPanel Margin="8">
+              <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                <TextBlock x:Name="GateStatusText" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,14,0"/>
+                <Button x:Name="GateStartBtn" Content="تشغيل الجسر" Padding="12,4" Margin="0,0,6,0" Click="GateStartBtn_Click"/>
+                <Button x:Name="GateStopBtn" Content="إيقاف الجسر" Padding="12,4" Margin="0,0,14,0" Click="GateStopBtn_Click"/>
+                <Button x:Name="BoxUnlockBtn" Content="فتح يدوي للمحدد" Padding="12,4" Margin="0,0,6,0" Click="BoxUnlockBtn_Click"/>
+                <Button x:Name="BoxLockBtn" Content="قفل يدوي للمحدد" Padding="12,4" Click="BoxLockBtn_Click"/>
+              </WrapPanel>
+              <Expander DockPanel.Dock="Bottom" Header="إضافة / تعديل محطة أو صندوق أو جهاز" IsExpanded="True" Margin="0,8,0,0">
+                <StackPanel Margin="4">
+                  <WrapPanel Margin="0,0,0,6">
+                    <TextBlock Text="محطة رقم" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="StationIdBox" Width="50" Margin="0,0,10,0"/>
+                    <TextBlock Text="اسمها" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="StationNameBox" Width="140" Margin="0,0,10,0"/>
+                    <CheckBox x:Name="StationSeriesBox" Content="عدّادان على الماء نفسه (تسلسل)" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Button x:Name="StationSaveBtn" Content="حفظ المحطة" Padding="10,3" Click="StationSaveBtn_Click"/>
+                  </WrapPanel>
+                  <WrapPanel>
+                    <TextBlock Text="صندوق رقم" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="BoxIdBox" Width="50" Margin="0,0,10,0"/>
+                    <TextBlock Text="الاسم" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="BoxNameBox" Width="120" Margin="0,0,10,0"/>
+                    <TextBlock Text="المحطة" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="BoxStationBox" Width="40" Margin="0,0,10,0"/>
+                    <TextBlock Text="الحنفية" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="BoxTapBox" Width="40" Margin="0,0,10,0"/>
+                    <TextBlock Text="العدّاد (1 أو 2)" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="BoxMeterBox" Width="40" Margin="0,0,10,0"/>
+                    <TextBlock Text="معرّف الجهاز" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="BoxDeviceBox" Width="110" FlowDirection="LeftToRight" Margin="0,0,10,0"/>
+                    <CheckBox x:Name="BoxEnabledBox" Content="مفعّل" IsChecked="True" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Button x:Name="BoxSaveBtn" Content="حفظ الصندوق" Padding="10,3" Margin="0,0,6,0" Click="BoxSaveBtn_Click"/>
+                    <Button x:Name="DeviceKeyBtn" Content="تسجيل الجهاز / مفتاح جديد" Padding="10,3" Click="DeviceKeyBtn_Click"/>
+                  </WrapPanel>
+                </StackPanel>
+              </Expander>
+              <DataGrid x:Name="BoxGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" CanUserAddRows="False"
+                        SelectionChanged="BoxGrid_SelectionChanged">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="#" Binding="{Binding Id}"/>
+                  <DataGridTextColumn Header="الصندوق" Binding="{Binding Name}"/>
+                  <DataGridTextColumn Header="المحطة" Binding="{Binding Station}"/>
+                  <DataGridTextColumn Header="الحنفية" Binding="{Binding Tap}"/>
+                  <DataGridTextColumn Header="العدّاد" Binding="{Binding Meter}"/>
+                  <DataGridTextColumn Header="الجهاز" Binding="{Binding Device}"/>
+                  <DataGridTextColumn Header="مفعّل" Binding="{Binding Enabled}"/>
+                  <DataGridTextColumn Header="الاتصال" Binding="{Binding Online}"/>
+                  <DataGridTextColumn Header="القفل (فعلي / مطلوب)" Binding="{Binding Lock}"/>
+                  <DataGridTextColumn Header="القارئ" Binding="{Binding Reader}"/>
+                  <DataGridTextColumn Header="العملية الحالية" Binding="{Binding Operation}" Width="*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
+          </TabItem>
+
+          <TabItem Header="البطاقات">
+            <DockPanel Margin="8">
+              <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                <TextBlock Text="تسجيل بطاقة جديدة: اختر صندوقًا من تبويب الصناديق ثم" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <Button x:Name="CardLearnBtn" Content="تعلّم بطاقة (مرّرها على الصندوق المحدد)" Padding="10,4" Margin="0,0,10,0" Click="CardLearnBtn_Click"/>
+                <TextBlock x:Name="CardLearnInfo" VerticalAlignment="Center" Foreground="DarkGreen"/>
+              </WrapPanel>
+              <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                <TextBlock Text="الوصف" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="CardLabelBox" Width="130" Margin="0,0,10,0"/>
+                <TextBlock Text="السائق" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="CardDriverBox" Width="130" Margin="0,0,10,0"/>
+                <TextBlock Text="الوايت" VerticalAlignment="Center" Margin="0,0,4,0"/><ComboBox x:Name="CardTruckCombo" Width="200" DisplayMemberPath="Label" Margin="0,0,10,0"/>
+                <Button x:Name="CardSaveBtn" Content="تسجيل البطاقة الملتقطة" Padding="10,4" Margin="0,0,6,0" Click="CardSaveBtn_Click"/>
+                <Button x:Name="CardRevokeBtn" Content="إلغاء البطاقة المحددة" Padding="10,4" Click="CardRevokeBtn_Click"/>
+              </WrapPanel>
+              <DataGrid x:Name="CardGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" CanUserAddRows="False">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="#" Binding="{Binding Id}"/>
+                  <DataGridTextColumn Header="الوصف" Binding="{Binding Label}"/>
+                  <DataGridTextColumn Header="السائق" Binding="{Binding Driver}"/>
+                  <DataGridTextColumn Header="الوايت" Binding="{Binding Truck}" Width="*"/>
+                  <DataGridTextColumn Header="الحالة" Binding="{Binding Status}"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
+          </TabItem>
+
+          <TabItem Header="السجل والأعطال">
+            <DockPanel Margin="8">
+              <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                <CheckBox x:Name="GateFaultsOnly" Content="الأعطال والرفض فقط" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <Button x:Name="GateRefreshBtn" Content="تحديث" Padding="10,3" Click="GateRefreshBtn_Click"/>
+              </WrapPanel>
+              <DataGrid x:Name="GateEventGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="الوقت" Binding="{Binding Time}"/>
+                  <DataGridTextColumn Header="الحدث" Binding="{Binding Kind}"/>
+                  <DataGridTextColumn Header="الصندوق" Binding="{Binding Box}"/>
+                  <DataGridTextColumn Header="التفاصيل" Binding="{Binding Data}" Width="*"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
+          </TabItem>
+
+          <TabItem Header="إعدادات الجسر">
+            <StackPanel Margin="18" MaxWidth="560" HorizontalAlignment="Right">
+              <CheckBox x:Name="GateEnabledBox" Content="تشغيل الجسر مع البرنامج" Margin="0,0,0,10"/>
+              <TextBlock Text="عنوان الشبكة المحلية للكمبيوتر (يُفضَّل بدل 0.0.0.0)"/><TextBox x:Name="GateBindBox" FlowDirection="LeftToRight" Margin="0,2,0,8"/>
+              <TextBlock Text="المنفذ"/><TextBox x:Name="GatePortBox" Margin="0,2,0,8"/>
+              <TextBlock Text="سياسة الرصيد"/>
+              <ComboBox x:Name="GatePolicyBox" Margin="0,2,0,8">
+                <ComboBoxItem Content="P1 — مدفوع مسبقًا (الدائن − المعلّق ≥ المطلوب)"/>
+                <ComboBoxItem Content="P2 — آجل بحد ائتمان"/>
+                <ComboBoxItem Content="P3 — تسجيل فقط (يُسمح دائمًا)"/>
+              </ComboBox>
+              <TextBlock Text="حد الائتمان (لسياسة P2)"/><TextBox x:Name="GateCreditBox" Margin="0,2,0,12"/>
+              <Button x:Name="GateSettingsSaveBtn" Content="حفظ وإعادة تشغيل الجسر" Padding="14,6" HorizontalAlignment="Left" Click="GateSettingsSaveBtn_Click"/>
+              <TextBlock TextWrapping="Wrap" Foreground="#555" Margin="0,14,0,0"
+                         Text="يجب السماح بمنفذ الجسر في جدار حماية ويندوز لشبكة الصناديق فقط. مفاتيح الأجهزة تُعرض مرة واحدة عند التسجيل. بدء التشغيل يتطلب ترخيصًا صالحًا وكاميرا متصلة."/>
+            </StackPanel>
+          </TabItem>
+
+        </TabControl>
+      </TabItem>
+
       <!-- ===================== الترخيص ===================== -->
       <TabItem Header="الترخيص">
         <StackPanel Margin="18" MaxWidth="560" HorizontalAlignment="Right">

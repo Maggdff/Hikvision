@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\SmartWater.Core\SmartWater.Core.csproj" />
+    <ProjectReference Include="..\SmartWater.Data\SmartWater.Data.csproj" />
+    <ProjectReference Include="..\SmartWater.Engine\SmartWater.Engine.csproj" />
+    <ProjectReference Include="..\SmartWater.Ebs\SmartWater.Ebs.csproj" />
+    <ProjectReference Include="..\SmartWater.Licensing\SmartWater.Licensing.csproj" />
+  </ItemGroup>
+</Project>

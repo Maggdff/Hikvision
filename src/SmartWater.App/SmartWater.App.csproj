@@ -12,6 +12,8 @@
     <!-- نستعمل WinForms للأيقونة فقط؛ نزيل الـusing الضمني كي لا تتعارض أسماء WPF -->
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
+    <!-- مشاريع WPF تُسقط System.IO من الـusing الضمني؛ نعيده صراحةً -->
+    <Using Include="System.IO" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SmartWater.Core\SmartWater.Core.csproj" />
@@ -19,5 +21,6 @@
     <ProjectReference Include="..\SmartWater.Engine\SmartWater.Engine.csproj" />
     <ProjectReference Include="..\SmartWater.Licensing\SmartWater.Licensing.csproj" />
     <ProjectReference Include="..\SmartWater.Ebs\SmartWater.Ebs.csproj" />
+    <ProjectReference Include="..\SmartWater.Gate\SmartWater.Gate.csproj" />
   </ItemGroup>
 </Project>

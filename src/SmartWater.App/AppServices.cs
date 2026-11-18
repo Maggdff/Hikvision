@@ -1,7 +1,9 @@
 using Microsoft.Win32;
 using SmartWater.Data;
 using SmartWater.Ebs;
+using Microsoft.AspNetCore.Builder;
 using SmartWater.Engine;
+using SmartWater.Gate;
 using SmartWater.Licensing;
 
 namespace SmartWater.App;
@@ -58,6 +60,14 @@ public sealed class AppServices : IDisposable
     public EbsSettings EbsSettings { get; private set; }
     public EbsClient EbsClient => _ebsClient;
 
+    // ---- WaterGateBridge (صناديق الحنفيات)
+    public GateDb GateDb { get; }
+    public GateSettings GateSettings { get; private set; }
+    public GateService? Gate { get; private set; }
+    private readonly GateSettingsStore _gateStore;
+    private WebApplication? _gateApp;
+    private System.Threading.Timer? _gateTimer;
+
     /// <summary>المستخدم يريد المراقبة شغّالة (تُستأنف تلقائيًا بعد الترخيص أو أي عطل).</summary>
     public bool DesiredRunning { get; set; } = true;
     public event Action<string>? Notify;
@@ -77,6 +87,9 @@ public sealed class AppServices : IDisposable
         EbsSettings = EbsStore.Load();
         EbsStore.Save(EbsSettings);                                           // يثبّت DeviceUuid من أول تشغيل
         _ebsClient = new EbsClient(EbsSettings);
+        GateDb = new GateDb(Path.Combine(DataDir, "gate.db"));
+        _gateStore = new GateSettingsStore(Path.Combine(DataDir, "gate-settings.json"), new DpapiKeyProtector());
+        GateSettings = _gateStore.Load();
         FileLog.Write("INFO", "بدء التطبيق");
     }
 
@@ -85,6 +98,47 @@ public sealed class AppServices : IDisposable
         EbsStore.Save(s);
         EbsSettings = s;
         _ebsClient = new EbsClient(s);          // جلسة جديدة بالإعدادات الجديدة
+    }
+
+    public void SaveGateSettings(GateSettings s) { GateSettings = s; _gateStore.Save(s); }
+
+    /// <summary>يشغّل الجسر (خدمة القرار + مضيف HTTP للأجهزة). يعيد null عند النجاح أو نص الخطأ.</summary>
+    public async Task<string?> StartGateAsync()
+    {
+        await StopGateAsync().ConfigureAwait(false);
+        try
+        {
+            var (gs, secret) = _gateStore.EnsureSecret(GateSettings);
+            GateSettings = gs;
+            var opts = new GateOptions { Policy = gs.Policy, CreditLimit = gs.CreditLimit, CardSecret = secret };
+            var clock = new SystemClock();
+            var balance = new EbsBalanceProvider(Ebs, () => EbsClient, () => EbsSettings, opts, clock);
+            var deps = new GateDeps(new EngineStationView(Engine, GateDb), new EngineStationControl(Engine), new TruckDirectory(Engine.Trucks, Ebs),
+                balance, new EbsExposureProvider(Engine.Swings, Ebs, () => EbsSettings), new EbsPriceProvider(() => EbsSettings),
+                new LicenseGateAdapter(License), clock, new DpapiKeyProtector());
+            var svc = new GateService(GateDb, opts, deps);
+            _gateApp = await GateHost.StartAsync(svc, $"http://{gs.BindIp}:{gs.Port}").ConfigureAwait(false);
+            Gate = svc;
+            _gateTimer = new System.Threading.Timer(_ =>
+            {
+                try { svc.Tick(); } catch (Exception e) { FileLog.Write("ERROR", "Gate.Tick: " + e); }
+            }, null, 1000, 1000);
+            FileLog.Write("INFO", $"بدأ الجسر على {gs.BindIp}:{gs.Port}");
+            return null;
+        }
+        catch (Exception e)
+        {
+            Gate = null;
+            FileLog.Write("ERROR", "تعذّر تشغيل الجسر: " + e);
+            return e.Message;
+        }
+    }
+
+    public async Task StopGateAsync()
+    {
+        _gateTimer?.Dispose(); _gateTimer = null;
+        var app = _gateApp; _gateApp = null; Gate = null;
+        if (app != null) { try { await app.StopAsync().ConfigureAwait(false); await app.DisposeAsync().ConfigureAwait(false); } catch { } }
     }
 
     public void StartMonitoring()
@@ -119,6 +173,8 @@ public sealed class AppServices : IDisposable
 
     public void Dispose()
     {
+        try { StopGateAsync().GetAwaiter().GetResult(); } catch { }
+        try { GateDb.Dispose(); } catch { }
         try { Engine.Dispose(); } catch { }
         try { Ebs.Dispose(); } catch { }
         FileLog.Write("INFO", "إغلاق التطبيق");

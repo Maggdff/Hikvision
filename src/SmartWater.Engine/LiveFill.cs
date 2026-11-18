@@ -102,6 +102,39 @@ public sealed class LiveFill
 
     public void MarkGap() { lock (_lock) _session?.MarkGap(); }
 
+    /// <summary>معلومات الجلسة الحالية للقراءة فقط (يستعملها WaterGateBridge): الرقم، الحالة، وهل جرى تدفق.</summary>
+    public (string? SessionId, FillState? State, bool HasFlowed) SessionInfo()
+    {
+        lock (_lock)
+        {
+            var s = _session;
+            if (s == null) return (null, null, false);
+            return (s.Id, s.Snapshot().State, s.HasFlowed);
+        }
+    }
+
+    private long _expectTruckId = -1, _expectUntil;
+
+    /// <summary>
+    /// هوية الوايت معروفة مسبقًا (بطاقة NFC): تُستعمل لأول جلسة تبدأ خلال 10 دقائق بدل مطابقة الصورة والسؤال.
+    /// إن كانت الجلسة جارية وحلقتها بلا وايت يُطبَّق الوايت عليها فورًا. لا تأثير إن لم تُستدعَ.
+    /// </summary>
+    public void ExpectTruck(long truckId)
+    {
+        lock (_lock)
+        {
+            if (_epId >= 0 && _truckFlow.EpisodeTruck(_epId) == null && _truckFlow.Choose(_epId, truckId)) return;
+            _expectTruckId = truckId; _expectUntil = _clock() + 10 * 60_000L;
+        }
+    }
+
+    private long? TakeExpected()
+    {
+        if (_expectTruckId < 0 || _clock() > _expectUntil) { _expectTruckId = -1; return null; }
+        long id = _expectTruckId; _expectTruckId = -1;
+        return id;
+    }
+
     public bool IsActive(int i) { lock (_lock) return _session?.IsActive(i) ?? false; }
     public double CurrentDegrees(int i) { lock (_lock) return _session?.CurrentDegrees(i) ?? 0.0; }
     public double CumulativeDegrees(int i) { lock (_lock) return _session?.CumulativeDegrees(i) ?? 0.0; }
@@ -123,7 +156,7 @@ public sealed class LiveFill
         if (_epId < 0 && !_epTried && _config().TruckChannel > 0 && _snapshots() != null)
         {
             _epTried = true;
-            _epId = _truckFlow.BeginEpisode(null);
+            _epId = _truckFlow.BeginEpisode(null, TakeExpected());
         }
         if (ms - _lastCkpt >= CkptMs)   // حفظ دوري للسجل أثناء التعبئة
         {

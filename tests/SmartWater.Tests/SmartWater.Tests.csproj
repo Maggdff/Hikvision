@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\src\SmartWater.Engine\SmartWater.Engine.csproj" />
     <ProjectReference Include="..\..\src\SmartWater.Data\SmartWater.Data.csproj" />
     <ProjectReference Include="..\..\src\SmartWater.Ebs\SmartWater.Ebs.csproj" />
+    <ProjectReference Include="..\..\src\SmartWater.Gate\SmartWater.Gate.csproj" />
     <None Include="testdata\**\*" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="..\..\src\SmartWater.Licensing\SmartWater.Licensing.csproj" />
   </ItemGroup>

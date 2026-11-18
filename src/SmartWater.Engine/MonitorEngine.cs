@@ -44,6 +44,7 @@ public sealed class MonitorEngine : IDisposable
     private int _fpsCount;
     private double _fps;
     private Mat? _latest, _still;
+    private readonly long[] _lastValid = new long[8];
 
     public bool Running => _running;
     public bool Connected => _connected;
@@ -120,6 +121,13 @@ public sealed class MonitorEngine : IDisposable
     /// <summary>يعتمد لقطة قناة الوايتات التالية خلفيةً فارغة لكاشف الوجود (والمنطقة خالية).</summary>
     public bool ResetPresenceBackground() { var f = _fill; if (f == null) return false; f.ResetBackground(); return true; }
 
+    // ---------- واجهة قراءة فقط لحالة المحطة (WaterGateBridge)
+    /// <summary>عمر آخر قراءة سليمة للعدّاد بالثواني (كبير جدًا إن لم تُقرأ).</summary>
+    public double MeterValidAgeSec(int i) => i < 0 || i >= _lastValid.Length || _lastValid[i] == 0 ? double.MaxValue : (Environment.TickCount64 - _lastValid[i]) / 1000.0;
+    public bool IsMeterActive(int i) => _fill?.IsActive(i) ?? false;
+    public (string? SessionId, FillState? State, bool HasFlowed) SessionInfo() => _fill?.SessionInfo() ?? (null, null, false);
+    public void ExpectTruck(long truckId) => _fill?.ExpectTruck(truckId);
+
     public FillStatus? CurrentFill() => _fill?.Status();
 
     // ---------- استقبال الإطارات ----------
@@ -158,7 +166,13 @@ public sealed class MonitorEngine : IDisposable
             var msg = $"تنبيه: عُويرت المواضع على إطار {cc.CalW}×{cc.CalH} والبث الآن {w}×{h} — أعد المعايرة إن اختلفت الصورة.";
             EngineLog.Info(msg); Status?.Invoke(msg);
         }
-        if (outside.Count == 0) { _roiWarnKey = 0; p.Process(gray, t); }
+        if (outside.Count == 0)
+        {
+            _roiWarnKey = 0; p.Process(gray, t);
+            long vt = Environment.TickCount64;
+            var smp = p.Samples;
+            for (int i = 0; i < smp.Count && i < _lastValid.Length; i++) if (smp[i].Valid) _lastValid[i] = vt;
+        }
         else if (_roiWarnKey != sizeKey)
         {
             _roiWarnKey = sizeKey;

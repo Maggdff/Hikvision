@@ -25,6 +25,7 @@ public sealed class TruckCoordinator
         public IReadOnlyList<long> Ranking = Array.Empty<long>();
         public string Note = "";
         public byte[]? PreJpeg;
+        public long? ExpectedTruckId;
         public bool Answered => Truck != null || Dismissed || Cancelled;
     }
 
@@ -58,11 +59,11 @@ public sealed class TruckCoordinator
 
     // ---------------- الحلقة مرتبطة بجلسة تعبئة ----------------
     /// <summary>بدأت تعبئة: التقط صورة الوايت (أو استعمل jpeg الجاهزة) وتعرّف عليه. يعيد رقم الحلقة.</summary>
-    public long BeginEpisode(byte[]? jpeg)
+    public long BeginEpisode(byte[]? jpeg, long? expectedTruckId = null)
     {
         var cfg = _config();
         Episode ep;
-        lock (_lock) { ep = new Episode(_nextId++) { PreJpeg = jpeg }; _episodes.Add(ep); }
+        lock (_lock) { ep = new Episode(_nextId++) { PreJpeg = jpeg, ExpectedTruckId = expectedTruckId }; _episodes.Add(ep); }
         EngineLog.Info($"دخل وايت: بدء التعرّف (حلقة {ep.Id})");
         var t = Task.Run(() => CaptureAsync(ep, cfg));
         lock (_lock) _captures.Add(t);
@@ -104,6 +105,9 @@ public sealed class TruckCoordinator
     {
         try
         {
+            // الوايت معروف من البطاقة: يُطبَّق فورًا (ولو تعذّر التقاط الصورة)، ثم نلتقط الصورة لتُحفظ مع السجل
+            if (ep.ExpectedTruckId is long expId && _trucks.Get(expId) is { } expTruck && Apply(ep, expTruck, learn: false))
+                Say($"الوايت من البطاقة: {expTruck.Name} — {Fmt(expTruck.Capacity)} برميل");
             byte[]? jpeg = ep.PreJpeg;
             if (jpeg == null && _snapshotSource() is { } src) jpeg = await src.SnapshotJpegAsync(cfg.TruckChannel).ConfigureAwait(false);
             ep.PreJpeg = null;

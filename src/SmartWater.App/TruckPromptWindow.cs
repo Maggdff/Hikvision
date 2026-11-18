@@ -17,11 +17,11 @@ public sealed class TruckPromptWindow : Window
         FlowDirection = FlowDirection.RightToLeft;
         Width = 560; Height = 660; Topmost = true;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        var root = new DockPanel { Margin = 12 };
+        var root = new DockPanel { Margin = new Thickness(12) };
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
-        var choose = new Button { Content = "اختيار هذا الوايت", Padding = new Thickness(16, 6), Margin = new Thickness(0, 0, 8, 0), IsEnabled = false };
-        var later = new Button { Content = "لاحقًا (أربطه من السجل)", Padding = new Thickness(16, 6) };
+        var choose = new Button { Content = "اختيار هذا الوايت", Padding = new Thickness(16, 6, 16, 6), Margin = new Thickness(0, 0, 8, 0), IsEnabled = false };
+        var later = new Button { Content = "لاحقًا (أربطه من السجل)", Padding = new Thickness(16, 6, 16, 6) };
         buttons.Children.Add(choose); buttons.Children.Add(later);
         DockPanel.SetDock(buttons, Dock.Bottom);
         root.Children.Add(buttons);

@@ -1,38 +1,43 @@
-name: Build APK from ZIP
-
+name: windows-build
 on:
   push:
   workflow_dispatch:
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-test:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '17' }
-
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: فك ملف المشروع المضغوط
-        run: |
-          ZIP=$(ls *.zip | head -1)
-          echo "ملف المشروع: $ZIP"
-          unzip -q "$ZIP" -d src_unzipped
-          # المشروع داخل مجلد واحد (SmartWaterMonitor)
-          DIR=$(find src_unzipped -name gradlew -maxdepth 3 -printf '%h\n' | head -1)
-          echo "جذر المشروع: $DIR"
-          echo "PROJECT_DIR=$DIR" >> "$GITHUB_ENV"
-          ls "$DIR/app/libs" "$DIR/app/src/main/jniLibs/armeabi-v7a" | head -30
-
-      - name: بناء Debug APK
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
-
-      - uses: actions/upload-artifact@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          name: SmartWaterMonitor-debug-apk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          dotnet-version: '8.0.x'
+      # يجد مجلد المشروع أينما وُضع في المستودع (جذر المستودع أو مجلد فرعي)
+      - name: Locate solution folder
+        id: loc
+        shell: pwsh
+        run: |
+          $p = Get-ChildItem -Recurse -Filter SmartWater.Tests.csproj | Select-Object -First 1
+          if (-not $p) { Write-Error "SmartWater.Tests.csproj not found"; exit 1 }
+          $root = $p.Directory.Parent.Parent.FullName
+          Write-Host "Solution root: $root"
+          "root=$root" >> $env:GITHUB_OUTPUT
+      - name: Test (Core, Licensing, Data, Ebs, Engine)
+        working-directory: ${{ steps.loc.outputs.root }}
+        run: dotnet test tests/SmartWater.Tests/SmartWater.Tests.csproj -c Release --logger "trx;LogFileName=results.trx"
+      - name: Build WPF app
+        if: always()
+        working-directory: ${{ steps.loc.outputs.root }}
+        run: dotnet build src/SmartWater.App/SmartWater.App.csproj -c Release
+      - name: Publish self-contained win-x64
+        if: always()
+        working-directory: ${{ steps.loc.outputs.root }}
+        run: dotnet publish src/SmartWater.App/SmartWater.App.csproj -c Release -r win-x64 --self-contained true -o publish
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: ${{ steps.loc.outputs.root }}/tests/SmartWater.Tests/TestResults/*.trx
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SmartWaterMonitor-win-x64
+          path: ${{ steps.loc.outputs.root }}/publish
