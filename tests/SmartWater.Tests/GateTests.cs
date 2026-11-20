@@ -84,6 +84,41 @@ public class GateAccessTests
     }
 
     [Fact]
+    public async Task Each_customer_has_their_own_credit_ceiling_and_others_use_the_default()
+    {
+        GateHarness P2(double defaultLimit) => new(new GateOptions { RestartGraceMin = 0, Policy = BalancePolicy.CreditLimit, CreditLimit = defaultLimit });
+
+        using var a = P2(10_000);                                                    // وايت 1 يحتاج 110000
+        a.Db.SetCustomerLimit("  وايت   أبو علي ", 30_000);                           // يُطبَّع الاسم (مسافات)
+        a.Balance.Result = new BalanceResult(true, 80_000, "live", 0);               // العجز 30000 = سقفه بالضبط
+        Assert.True((await a.Tap("ESP1", "AA11")).Allowed);
+
+        using var b = P2(10_000);
+        b.Db.SetCustomerLimit(Name1, 29_999);
+        b.Balance.Result = new BalanceResult(true, 80_000, "live", 0);               // العجز 30000 > 29999
+        Assert.Equal("insufficient_balance", (await b.Tap("ESP1", "AA11")).Reason);
+
+        using var c = P2(10_000);                                                    // وايت 2 بلا سقف خاص: الافتراضي 10000، ويحتاج 80000
+        c.Balance.Result = new BalanceResult(true, 75_000, "live", 0);               // عجز 5000
+        Assert.True((await c.Tap("ESP3", "BB22")).Allowed);
+        using var d = P2(10_000);
+        d.Balance.Result = new BalanceResult(true, 60_000, "live", 0);               // عجز 20000 > 10000
+        Assert.Equal("insufficient_balance", (await d.Tap("ESP3", "BB22")).Reason);
+
+        using var e = P2(10_000);                                                    // سقف خاص صفر = لا دين، رغم الافتراضي
+        e.Db.SetCustomerLimit(Name2, 0);
+        e.Balance.Result = new BalanceResult(true, 79_999, "live", 0);
+        Assert.Equal("insufficient_balance", (await e.Tap("ESP3", "BB22")).Reason);
+        e.Balance.Result = new BalanceResult(true, 80_000, "live", 0);
+        Assert.True((await e.Tap("ESP3", "BB22")).Allowed);
+
+        Assert.Equal(30_000.0, a.Db.CustomerLimit(Name1));
+        a.Svc.RemoveCustomerLimit(Name1);
+        Assert.Null(a.Db.CustomerLimit(Name1));
+        Assert.Contains(a.Db.Events(50, "admin.limit_removed"), x => x.Data == Name1);
+    }
+
+    [Fact]
     public async Task System_not_ready_license_and_customer_checks_deny()
     {
         using var h = new GateHarness();
@@ -373,6 +408,18 @@ public class GateDeviceTests
         Assert.Equal(AuthStatus.UnknownDevice, h.Svc.Authenticate("NOPE", 1, ts5, "n", "00", "POST", "/api/access/check", body));
         var (sig6, ts6) = Sign(h, "ESP2", 1, "x", body);                       // توقيع جهاز آخر لا يصلح لهذا الجهاز
         Assert.Equal(AuthStatus.BadSignature, h.Svc.Authenticate("ESP1", 14, ts6, "x", sig6, "POST", "/api/access/check", body));
+    }
+
+    [Fact]
+    public void Signing_matches_the_reference_vector_used_by_the_firmware()
+    {
+        // نفس المتجه في firmware/tools/sign_check.py وفي أمر SELFTEST على الجهاز
+        var key = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
+        var body = Encoding.UTF8.GetBytes("{\"uid\":\"04A1B2C3\"}");
+        Assert.Equal("POST\n/api/access/check\nESP1\n7\n1800000000123\n0123456789abcdef\n5f97c4cade46a304d020327ebc47523d388f7d4db05f7e3243be69b06281fc5a",
+            GateAuth.Canonical("POST", "/api/access/check", "ESP1", 7, 1800000000123, "0123456789abcdef", body));
+        Assert.Equal("698a6bfb075693abd6a7e1553ef3dba3bbee17b293023dbf3e89584c633ae08f",
+            GateAuth.Sign(key, "POST", "/api/access/check", "ESP1", 7, 1800000000123, "0123456789abcdef", body));
     }
 
     // ---------------- بروتوكول HTTP كاملًا على Kestrel حقيقي

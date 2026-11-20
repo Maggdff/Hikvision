@@ -271,6 +271,29 @@
             </DockPanel>
           </TabItem>
 
+          <TabItem Header="سقوف العملاء">
+            <DockPanel Margin="8">
+              <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="#555" Margin="0,0,0,8"
+                         Text="لكل عميل سقف ائتمان خاص به (أقصى دين مسموح به بعد التعبئة) ويُطبَّق بسياسة «آجل بحد ائتمان» P2. العميل بلا سقف خاص يُطبَّق عليه السقف الافتراضي من إعدادات الجسر. السقف 0 = لا دين."/>
+              <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                <TextBlock Text="العميل" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="LimitCustomerCombo" IsEditable="True" Width="260" Margin="0,0,10,0"/>
+                <TextBlock Text="السقف" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="LimitValueBox" Width="110" Margin="0,0,10,0"/>
+                <Button x:Name="LimitSaveBtn" Content="حفظ السقف" Padding="10,4" Margin="0,0,6,0" Click="LimitSaveBtn_Click"/>
+                <Button x:Name="LimitDeleteBtn" Content="حذف السقف الخاص" Padding="10,4" Click="LimitDeleteBtn_Click"/>
+              </WrapPanel>
+              <DataGrid x:Name="LimitGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" CanUserAddRows="False"
+                        SelectionChanged="LimitGrid_SelectionChanged">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="العميل" Binding="{Binding Customer}" Width="*"/>
+                  <DataGridTextColumn Header="السقف" Binding="{Binding Limit}"/>
+                  <DataGridTextColumn Header="الرصيد (آخر تحميل، موجب = دائن)" Binding="{Binding Balance}"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            </DockPanel>
+          </TabItem>
+
           <TabItem Header="السجل والأعطال">
             <DockPanel Margin="8">
               <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -299,7 +322,7 @@
                 <ComboBoxItem Content="P2 — آجل بحد ائتمان"/>
                 <ComboBoxItem Content="P3 — تسجيل فقط (يُسمح دائمًا)"/>
               </ComboBox>
-              <TextBlock Text="حد الائتمان (لسياسة P2)"/><TextBox x:Name="GateCreditBox" Margin="0,2,0,12"/>
+              <TextBlock Text="حد الائتمان الافتراضي (لعميل بلا سقف خاص — سياسة P2)"/><TextBox x:Name="GateCreditBox" Margin="0,2,0,12"/>
               <Button x:Name="GateSettingsSaveBtn" Content="حفظ وإعادة تشغيل الجسر" Padding="14,6" HorizontalAlignment="Left" Click="GateSettingsSaveBtn_Click"/>
               <TextBlock TextWrapping="Wrap" Foreground="#555" Margin="0,14,0,0"
                          Text="يجب السماح بمنفذ الجسر في جدار حماية ويندوز لشبكة الصناديق فقط. مفاتيح الأجهزة تُعرض مرة واحدة عند التسجيل. بدء التشغيل يتطلب ترخيصًا صالحًا وكاميرا متصلة."/>

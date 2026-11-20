@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +14,7 @@ namespace SmartWater.Gate;
 /// </summary>
 public static class GateHost
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
 
     public static async Task<WebApplication> StartAsync(GateService svc, string url)
     {
@@ -61,7 +62,7 @@ public static class GateHost
         if (st != AuthStatus.Ok)
         {
             ctx.Response.StatusCode = 401;
-            await ctx.Response.WriteAsJsonAsync(new { error = st.ToString() }, Json).ConfigureAwait(false);
+            await ctx.Response.WriteAsJsonAsync(new { error = st.ToString(), serverTimeMs = svc.ServerNowMs }, Json).ConfigureAwait(false);
             return;
         }
         JsonDocument doc;

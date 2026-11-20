@@ -19,6 +19,7 @@ public partial class MainWindow
         GateEnabledBox.IsChecked = gs.Enabled; GateBindBox.Text = gs.BindIp; GatePortBox.Text = gs.Port.ToString(CultureInfo.InvariantCulture);
         GatePolicyBox.SelectedIndex = (int)gs.Policy; GateCreditBox.Text = Ui.N(gs.CreditLimit);
         RefreshGateUi(true);
+        RefreshLimits();
     }
 
     /// <summary>تحديث الجداول (الصناديق/البطاقات/السجل) مع الحفاظ على التحديد؛ القوائم المنسدلة عند الطلب فقط.</summary>
@@ -96,7 +97,7 @@ public partial class MainWindow
     }
 
     private async void GateStopBtn_Click(object sender, RoutedEventArgs e) { await _s.StopGateAsync(); RefreshGateUi(); }
-    private void GateRefreshBtn_Click(object sender, RoutedEventArgs e) => RefreshGateUi(true);
+    private void GateRefreshBtn_Click(object sender, RoutedEventArgs e) { RefreshGateUi(true); RefreshLimits(); }
 
     private void GateSettingsSaveBtn_Click(object sender, RoutedEventArgs e)
     {
@@ -198,5 +199,47 @@ public partial class MainWindow
         if (MessageBox.Show($"إلغاء البطاقة «{c.Label}»؟ لا يمكنها بعد ذلك فتح أي صندوق.", "تأكيد", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
         Gate.RevokeCard(c.Id);
         RefreshGateUi();
+    }
+
+    // ---------------- سقوف العملاء
+    private void RefreshLimits()
+    {
+        var db = _s.GateDb;
+        long? cur = _s.Ebs.CurrencyId(_s.EbsSettings.Currency);
+        LimitCustomerCombo.ItemsSource = _s.Ebs.Customers().Select(c => c.Name).ToList();
+        LimitGrid.ItemsSource = db.CustomerLimits().Select(l =>
+        {
+            var cust = _s.Ebs.FindCustomer(l.Customer);
+            double? bal = cust?.AccountId is long acc ? _s.Ebs.SnapshotCredit(acc, cur) : null;
+            return new LimitRow(l.Customer, Ui.N(l.Limit), bal == null ? "—" : Ui.N(bal.Value));
+        }).ToList();
+    }
+
+    private void LimitGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (LimitGrid.SelectedItem is LimitRow r) { LimitCustomerCombo.Text = r.Customer; LimitValueBox.Text = r.Limit; }
+    }
+
+    private void LimitSaveBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var name = LimitCustomerCombo.Text.Trim();
+        if (name.Length == 0) { MessageBox.Show("اختر العميل أو اكتب اسمه كما في EBS."); return; }
+        if (!Ui.TryNum(LimitValueBox.Text, out var limit) || limit < 0) { MessageBox.Show("اكتب سقفًا صحيحًا (0 أو أكثر)."); return; }
+        if (_s.Ebs.CustomerCount() > 0 && _s.Ebs.FindCustomer(name) == null &&
+            MessageBox.Show($"«{name}» ليس في قائمة عملاء EBS المحمَّلة. تأكد من الاسم (يجب أن يطابق اسم الوايت). حفظ على أي حال؟", "تنبيه", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (Gate != null) Gate.SetCustomerLimit(name, limit);
+        else { _s.GateDb.SetCustomerLimit(name, limit); _s.GateDb.Log(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), "admin.limit_set", data: $"{name} = {Ui.N(limit)}"); }
+        RefreshLimits();
+        StatusText.Text = $"حُفظ سقف «{name}».";
+    }
+
+    private void LimitDeleteBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var name = LimitCustomerCombo.Text.Trim();
+        if (name.Length == 0 || _s.GateDb.CustomerLimit(name) == null) { MessageBox.Show("اختر عميلًا له سقف خاص."); return; }
+        if (Gate != null) Gate.RemoveCustomerLimit(name);
+        else { _s.GateDb.RemoveCustomerLimit(name); _s.GateDb.Log(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), "admin.limit_removed", data: name); }
+        RefreshLimits();
+        StatusText.Text = $"حُذف السقف الخاص لـ«{name}»؛ يُطبَّق الافتراضي.";
     }
 }

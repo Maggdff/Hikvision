@@ -46,6 +46,8 @@ public sealed class GateService
     }
 
     private long Now => _d.Clock.NowMs;
+    /// <summary>وقت الخادم (ms) — تُرسله الاستجابات لتضبط الأجهزة ساعتها (لا RTC ولا NTP).</summary>
+    public long ServerNowMs => Now;
     private static string NewId() => Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
 
     private void Log(string kind, int? boxId = null, string? deviceId = null, long? opId = null, long? cardId = null, string data = "") =>
@@ -109,6 +111,16 @@ public sealed class GateService
             return (_learn != null, _learnedHash);
         }
     }
+
+    /// <summary>سقف ائتمان خاص بعميل (أقصى دين مسموح به بعد هذه التعبئة، تحت سياسة P2). 0 = لا دين.</summary>
+    public void SetCustomerLimit(string customer, double limit)
+    {
+        if (limit < 0 || double.IsNaN(limit)) throw new ArgumentException("السقف لا يكون سالبًا");
+        _db.SetCustomerLimit(customer, limit);
+        Log("admin.limit_set", data: $"{customer} = {limit:0.##}");
+    }
+
+    public void RemoveCustomerLimit(string customer) { _db.RemoveCustomerLimit(customer); Log("admin.limit_removed", data: customer); }
 
     public void RevokeCard(long cardId) { _db.RevokeCard(cardId, Now); Log("admin.card_revoked", cardId: cardId); }
 
@@ -247,12 +259,13 @@ public sealed class GateService
                 price = p.Value; required = truck.Capacity * price;
                 var bal = await _d.Balance.GetAsync(truck.Name, ct).ConfigureAwait(false);
                 double pending = _d.Exposure.PendingAmount(truck.Name);
-                string info = $"required={required:0.##} credit={bal.Credit:0.##} pending={pending:0.##} src={bal.Source} age={bal.AgeSec}s policy={_o.Policy}";
+                double limit = _db.CustomerLimit(truck.Name) ?? _o.CreditLimit;            // سقف العميل الخاص، وإلا الافتراضي
+                string info = $"required={required:0.##} credit={bal.Credit:0.##} pending={pending:0.##} limit={limit:0.##} src={bal.Source} age={bal.AgeSec}s policy={_o.Policy}";
                 if (_o.Policy != BalancePolicy.LogOnly)
                 {
                     if (!bal.Available) return Deny("balance_unavailable", box, deviceId, card, hash, info);
                     double net = bal.Credit - pending;
-                    bool ok = _o.Policy == BalancePolicy.Prepaid ? net >= required : net - required >= -_o.CreditLimit;
+                    bool ok = _o.Policy == BalancePolicy.Prepaid ? net >= required : net - required >= -limit;
                     if (!ok) return Deny("insufficient_balance", box, deviceId, card, hash, info);
                 }
                 lock (_lock) Log("balance.checked", box.Id, deviceId, null, card.Id, info);

@@ -32,6 +32,36 @@ public sealed class GateDb : IDisposable
             Sql.Exec(_db, "CREATE INDEX IF NOT EXISTS idx_ops_state ON operations(state)");
             Sql.SetUserVersion(_db, 1);
         }
+        // جدول لاحق: يُنشأ دائمًا (قواعد قديمة بإصدار 1 لا تملكه)
+        Sql.Exec(_db, "CREATE TABLE IF NOT EXISTS customer_limits(customer TEXT PRIMARY KEY COLLATE NOCASE, credit_limit REAL NOT NULL)");
+    }
+
+    private static string NormName(string? s) => System.Text.RegularExpressions.Regex.Replace((s ?? "").Trim(), @"\s+", " ");
+
+    // ------------------------------------------------------------ سقف الائتمان لكل عميل (إعداد سياسة، وليس رصيدًا)
+    public void SetCustomerLimit(string customer, double limit)
+    {
+        lock (_lock) Sql.Exec(_db, "INSERT OR REPLACE INTO customer_limits(customer,credit_limit) VALUES(@c,@l)", ("@c", NormName(customer)), ("@l", limit));
+    }
+
+    public void RemoveCustomerLimit(string customer)
+    {
+        lock (_lock) Sql.Exec(_db, "DELETE FROM customer_limits WHERE customer=@c", ("@c", NormName(customer)));
+    }
+
+    /// <summary>سقف العميل الخاص، أو null إن لم يُحدَّد (فيُستعمل السقف الافتراضي).</summary>
+    public double? CustomerLimit(string customer)
+    {
+        lock (_lock)
+        {
+            var l = Sql.Query(_db, "SELECT credit_limit FROM customer_limits WHERE customer=@c", r => r.GetDouble(0), ("@c", NormName(customer)));
+            return l.Count > 0 ? l[0] : null;
+        }
+    }
+
+    public IReadOnlyList<(string Customer, double Limit)> CustomerLimits()
+    {
+        lock (_lock) return Sql.Query(_db, "SELECT customer,credit_limit FROM customer_limits ORDER BY customer COLLATE NOCASE", r => (r.GetString(0), r.GetDouble(1)));
     }
 
     private static T P<T>(string s) where T : struct => Enum.Parse<T>(s);

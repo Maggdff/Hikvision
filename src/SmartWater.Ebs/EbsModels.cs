@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.Json.Nodes;
 
 namespace SmartWater.Ebs;
@@ -40,6 +41,8 @@ internal static class EbsJson
     public static readonly JsonSerializerOptions Opts = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,   // عربي خام كما يرسله أندرويد
+        // JsonNode.ToJsonString(options) يجعل الخيارات للقراءة فقط ويشترط وجود TypeInfoResolver (كان سبب فشل دخول EBS في الاختبارات)
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
     };
 
     public static string Str(JsonNode n) => n.ToJsonString(Opts);
