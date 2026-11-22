@@ -1,20 +1,27 @@
+
 name: Android Demo APK
 
-# بناء APK تجريبي (بيانات وهمية، بلا Firebase ولا خادم) لمعاينة الواجهات على الهاتف
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['android/**', '.github/workflows/android-demo.yml']
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-demo.yml'
+
+permissions:
+  contents: write
 
 jobs:
   demo:
     runs-on: ubuntu-latest
     env:
       VOICEUP_DEMO: 'true'
+
     defaults:
       run:
         working-directory: android
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +37,22 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
         with:
           name: voiceup-demo-apk
           path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Publish APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: demo-latest
+          name: VoiceUp Demo - Latest Build
+          prerelease: true
+          make_latest: false
+          files: android/app/build/outputs/apk/debug/*.apk
+          fail_on_unmatched_files: true
+          body: |
+            Latest automatically generated VoiceUp Demo APK.
+            This version is for testing and preview.
