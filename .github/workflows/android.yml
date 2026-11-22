@@ -1,23 +1,27 @@
-name: Android CI
+
+name: Android Demo APK
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
-    paths: ['android/**', '.github/workflows/android.yml']
-  pull_request:
-    paths: ['android/**', '.github/workflows/android.yml']
-  workflow_dispatch:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-demo.yml'
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    # يعمل فقط بعد إنشاء مشروع Gradle في المرحلة 0 (android/gradlew)
-    if: hashFiles('android/gradlew') != ''
+  demo:
     runs-on: ubuntu-latest
     env:
-      VOICEUP_API_URL: ${{ vars.VOICEUP_API_URL }}
+      VOICEUP_DEMO: 'true'
+
     defaults:
       run:
         working-directory: android
+
     steps:
       - uses: actions/checkout@v4
 
@@ -28,34 +32,27 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # google-services.json يأتي من سر GitHub (Base64)، ولا يُرفع إلى المستودع
-      - name: Restore Firebase config
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+      - name: Build demo APK
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
-          fi
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
-      # مفتاح debug ثابت من سر GitHub لتبقى بصمة SHA-1 نفسها في كل بناء
-      - name: Restore debug keystore
-        env:
-          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
-            echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > app/debug.keystore
-          fi
-
-      - name: Unit tests
-        run: ./gradlew testDebugUnitTest --no-daemon
-
-      - name: Lint
-        run: ./gradlew lintDebug --no-daemon
-
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: voiceup-debug-apk
+          name: voiceup-demo-apk
           path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Publish APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: demo-latest
+          name: VoiceUp Demo - Latest Build
+          prerelease: true
+          make_latest: false
+          files: android/app/build/outputs/apk/debug/*.apk
+          fail_on_unmatched_files: true
+          body: |
+            Latest automatically generated VoiceUp Demo APK.
+            This version is for testing and preview.
