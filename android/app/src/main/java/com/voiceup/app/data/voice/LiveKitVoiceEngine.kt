@@ -42,7 +42,7 @@ class LiveKitVoiceEngine(context: Context) : VoiceEngine {
 
         // نبدأ الاستماع للأحداث قبل الاتصال حتى لا يفوتنا حدث
         eventsJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            r.events.collect { event ->
+            r.events.events.collect { event ->
                 when (event) {
                     is RoomEvent.ActiveSpeakersChanged ->
                         _speaking.value = event.speakers.mapNotNull { it.identity?.value }.toSet()
