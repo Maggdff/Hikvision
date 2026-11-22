@@ -101,25 +101,19 @@
     <string name="profile_error_generic">تعذر حفظ الملف. حاول مرة أخرى</string>
     <string name="profile_underage_title">التطبيق للبالغين فقط</string>
     <string name="profile_underage_body">VoiceUp متاح لمن عمره 18 سنة أو أكثر. لم نحفظ أي بيانات عن تاريخ ميلادك.</string>
-
-    <!-- الواجهة الجديدة -->
-    <string name="live">مباشر</string>
-    <string name="home_greeting">مرحباً، %1$s</string>
-    <string name="home_live_rooms">الغرف المباشرة</string>
-    <string name="search_hint">ابحث عن غرفة…</string>
-    <string name="cat_literature">أدب وشعر</string>
-    <string name="cat_tech">تقنية</string>
-    <string name="cat_games">ألعاب</string>
-    <string name="cat_languages">لغات</string>
-    <string name="home_no_results">لا توجد غرف مطابقة لبحثك</string>
-    <string name="tab_home">الرئيسية</string>
-    <string name="tab_discover">اكتشف</string>
-    <string name="tab_messages">الرسائل</string>
-    <string name="tab_me">حسابي</string>
-    <string name="soon_title">قريباً</string>
-    <string name="discover_soon_body">اكتشف غرفاً وأشخاصاً جدداً حسب اهتماماتك</string>
-    <string name="messages_soon_body">رسائل خاصة مع أصدقائك</string>
-    <string name="me_followers">متابعون</string>
-    <string name="me_following">يتابع</string>
-    <string name="me_level">المستوى</string>
+    <string name="home_sort_popular">الأكثر نشاطاً</string>
+    <string name="home_sort_new">الأحدث</string>
+    <string name="home_empty_country">لا توجد غرف نشطة في %1$s الآن</string>
+    <string name="country_all">كل الدول</string>
+    <string name="country_pick_title">اختر الدولة</string>
+    <string name="create_country_none">الدولة (اختياري)</string>
+    <string name="err_invalid_country">الدولة غير مدعومة</string>
+    <string name="nav_home">الرئيسية</string>
+    <string name="nav_account">حسابي</string>
+    <string name="account_edit">تعديل الملف</string>
+    <string name="account_save">حفظ</string>
+    <string name="account_no_bio">لم تضف نبذة بعد</string>
+    <string name="account_err_name">الاسم المعروض من 1 إلى 30 حرفاً</string>
+    <string name="account_err_bio">النبذة حتى 160 حرفاً</string>
+    <string name="account_err_save">تعذر حفظ التعديلات. حاول مرة أخرى</string>
 </resources>

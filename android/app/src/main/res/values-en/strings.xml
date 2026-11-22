@@ -101,25 +101,19 @@
     <string name="profile_error_generic">Couldn\'t save your profile. Please try again</string>
     <string name="profile_underage_title">VoiceUp is for adults only</string>
     <string name="profile_underage_body">You must be 18 or older to use VoiceUp. We did not store your date of birth.</string>
-
-    <!-- New UI -->
-    <string name="live">LIVE</string>
-    <string name="home_greeting">Hello, %1$s</string>
-    <string name="home_live_rooms">Live rooms</string>
-    <string name="search_hint">Search rooms…</string>
-    <string name="cat_literature">Literature</string>
-    <string name="cat_tech">Tech</string>
-    <string name="cat_games">Games</string>
-    <string name="cat_languages">Languages</string>
-    <string name="home_no_results">No rooms match your search</string>
-    <string name="tab_home">Home</string>
-    <string name="tab_discover">Discover</string>
-    <string name="tab_messages">Messages</string>
-    <string name="tab_me">Me</string>
-    <string name="soon_title">Coming soon</string>
-    <string name="discover_soon_body">Find new rooms and people based on your interests</string>
-    <string name="messages_soon_body">Private messages with your friends</string>
-    <string name="me_followers">Followers</string>
-    <string name="me_following">Following</string>
-    <string name="me_level">Level</string>
+    <string name="home_sort_popular">Most active</string>
+    <string name="home_sort_new">Newest</string>
+    <string name="home_empty_country">No active rooms in %1$s right now</string>
+    <string name="country_all">All countries</string>
+    <string name="country_pick_title">Choose a country</string>
+    <string name="create_country_none">Country (optional)</string>
+    <string name="err_invalid_country">Unsupported country</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_account">Account</string>
+    <string name="account_edit">Edit profile</string>
+    <string name="account_save">Save</string>
+    <string name="account_no_bio">No bio yet</string>
+    <string name="account_err_name">Display name must be 1 to 30 characters</string>
+    <string name="account_err_bio">Bio can be up to 160 characters</string>
+    <string name="account_err_save">Could not save changes. Try again</string>
 </resources>

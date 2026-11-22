@@ -29,21 +29,25 @@ class FakeRoomsRepository : RoomsRepository {
     var joinInfo = JoinInfo("token-1", "wss://voice.test", RoomRole.Member, null)
     val calls = mutableListOf<String>()
     var listRequestsCalls = 0
+    var lastCountryFilter: String? = null
+    var listCalls = 0
 
     private fun action(name: String) {
         calls += name
         actionError?.let { throw it }
     }
 
-    override suspend fun getActiveRooms(): List<VoiceRoom> {
+    override suspend fun getActiveRooms(country: String?): List<VoiceRoom> {
+        lastCountryFilter = country
+        listCalls++
         listError?.let { throw it }
-        return rooms
+        return if (country == null) rooms else rooms.filter { it.country == country }
     }
 
-    override suspend fun createRoom(title: String, topic: String?): VoiceRoom {
-        calls += "create:$title:$topic"
+    override suspend fun createRoom(title: String, topic: String?, country: String?): VoiceRoom {
+        calls += "create:$title:$topic:$country"
         createError?.let { throw it }
-        return VoiceRoom("new-room", title, topic, "me", 1, 8)
+        return VoiceRoom("new-room", title, topic, "me", 1, 8, country)
     }
 
     override suspend fun getRoomState(roomId: String): RoomState {
@@ -104,9 +108,15 @@ class FakeVoiceEngine : VoiceEngine {
 
 class FakeProfiles(private val names: Map<String, String> = emptyMap()) : ProfileRepository {
     var failLookups = false
+    var failUpdate = false
+    val updates = mutableListOf<String>()
     override suspend fun getProfile(uid: String): UserProfile? {
         if (failLookups) error("offline")
         return names[uid]?.let { UserProfile(uid, uid, it, "") }
     }
     override suspend fun createProfile(uid: String, draft: ProfileDraft) {}
+    override suspend fun updateProfile(uid: String, displayName: String, bio: String, country: String?) {
+        if (failUpdate) error("offline")
+        updates += "$uid:$displayName:$bio:$country"
+    }
 }

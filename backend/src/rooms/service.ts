@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { badRequest, conflict, forbidden, notFound } from '../errors.js';
 import type { VoiceProvider } from '../voice.js';
+import { isSupportedCountry } from './countries.js';
 
 export type Role = 'owner' | 'moderator' | 'member';
 const RANK: Record<Role, number> = { owner: 3, moderator: 2, member: 1 };
@@ -12,6 +13,7 @@ export interface RoomSummary {
   ownerUid: string;
   seatedCount: number;
   maxSeats: number;
+  country: string | null;
   createdAt: string;
 }
 
@@ -98,18 +100,26 @@ export class RoomService {
 
   // ---------- الغرف ----------
 
-  async createRoom(uid: string, title: string, topic: string | null, maxSeats = 8): Promise<RoomSummary> {
+  async createRoom(
+    uid: string,
+    title: string,
+    topic: string | null,
+    country: string | null = null,
+    maxSeats = 8,
+  ): Promise<RoomSummary> {
     const cleanTitle = title.trim();
     if (cleanTitle.length < 3 || cleanTitle.length > 60) throw badRequest('invalid_title');
     const cleanTopic = topic?.trim() || null;
     if (cleanTopic && cleanTopic.length > 30) throw badRequest('invalid_topic');
+    const cleanCountry = country ? country.trim().toUpperCase() : null;
+    if (cleanCountry && !isSupportedCountry(cleanCountry)) throw badRequest('invalid_country');
 
     try {
       return await this.tx(async (c) => {
         const r = await c.query(
-          `INSERT INTO rooms(owner_uid, title, topic, max_seats) VALUES ($1,$2,$3,$4)
+          `INSERT INTO rooms(owner_uid, title, topic, max_seats, country) VALUES ($1,$2,$3,$4,$5)
            RETURNING id, created_at`,
-          [uid, cleanTitle, cleanTopic, maxSeats],
+          [uid, cleanTitle, cleanTopic, maxSeats, cleanCountry],
         );
         const id = r.rows[0].id as string;
         await c.query(`INSERT INTO room_roles(room_id, uid, role) VALUES ($1,$2,'owner')`, [id, uid]);
@@ -121,6 +131,7 @@ export class RoomService {
           ownerUid: uid,
           seatedCount: 1,
           maxSeats,
+          country: cleanCountry,
           createdAt: (r.rows[0].created_at as Date).toISOString(),
         };
       });
@@ -130,13 +141,15 @@ export class RoomService {
     }
   }
 
-  async listOpenRooms(limit = 50): Promise<RoomSummary[]> {
+  async listOpenRooms(limit = 50, country: string | null = null): Promise<RoomSummary[]> {
+    const cc = country ? country.trim().toUpperCase() : null;
+    if (cc && !isSupportedCountry(cc)) throw badRequest('invalid_country');
     const r = await this.pool.query(
-      `SELECT r.id, r.title, r.topic, r.owner_uid, r.max_seats, r.created_at,
+      `SELECT r.id, r.title, r.topic, r.owner_uid, r.max_seats, r.country, r.created_at,
               (SELECT count(*) FROM room_seats s WHERE s.room_id = r.id)::int AS seated
-         FROM rooms r WHERE r.status = 'open'
+         FROM rooms r WHERE r.status = 'open' AND ($2::text IS NULL OR r.country = $2)
          ORDER BY r.created_at DESC LIMIT $1`,
-      [Math.min(Math.max(limit, 1), 100)],
+      [Math.min(Math.max(limit, 1), 100), cc],
     );
     return r.rows.map((x) => ({
       id: x.id,
@@ -145,6 +158,7 @@ export class RoomService {
       ownerUid: x.owner_uid,
       seatedCount: x.seated,
       maxSeats: x.max_seats,
+      country: x.country,
       createdAt: (x.created_at as Date).toISOString(),
     }));
   }

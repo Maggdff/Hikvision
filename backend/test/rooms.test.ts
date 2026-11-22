@@ -72,6 +72,31 @@ d('rooms API (Postgres)', () => {
     return ap.json();
   }
 
+  it('stores a supported country and filters the list by it', async () => {
+    const a = await call('uid-a', 'POST', '/rooms', { title: 'غرفة الرياض', country: 'sa' });
+    expect(a.statusCode).toBe(201);
+    expect(a.json().country).toBe('SA');
+    await call('uid-b', 'POST', '/rooms', { title: 'غرفة القاهرة', country: 'EG' });
+    await call('uid-c', 'POST', '/rooms', { title: 'بلا دولة' });
+
+    const all = (await call('uid-x', 'GET', '/rooms')).json().rooms;
+    expect(all).toHaveLength(3);
+    const sa = (await call('uid-x', 'GET', '/rooms?country=SA')).json().rooms;
+    expect(sa.map((r: { title: string }) => r.title)).toEqual(['غرفة الرياض']);
+    expect(all.find((r: { title: string }) => r.title === 'بلا دولة').country).toBeNull();
+  });
+
+  it('rejects unsupported or malformed countries', async () => {
+    const bad = await call('uid-a', 'POST', '/rooms', { title: 'غرفة', country: 'US' });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().error).toBe('invalid_country');
+    const wrongType = await call('uid-a', 'POST', '/rooms', { title: 'غرفة', country: 5 });
+    expect(wrongType.statusCode).toBe(400);
+    const badFilter = await call('uid-a', 'GET', '/rooms?country=XX');
+    expect(badFilter.statusCode).toBe(400);
+    expect((await call('uid-a', 'GET', '/rooms')).json().rooms).toHaveLength(0);
+  });
+
   it('rejects missing or invalid tokens', async () => {
     expect((await call(null, 'GET', '/rooms')).statusCode).toBe(401);
     expect((await call('garbage', 'GET', '/rooms')).statusCode).toBe(401);

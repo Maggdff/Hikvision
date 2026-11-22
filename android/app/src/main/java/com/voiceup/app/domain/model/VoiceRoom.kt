@@ -7,6 +7,9 @@ data class VoiceRoom(
     val ownerUid: String,
     val seatedCount: Int,
     val maxSeats: Int,
+    val country: String? = null,
+    /** وقت الإنشاء بصيغة ISO-8601 (UTC)، وترتيبه النصي يطابق ترتيبه الزمني. */
+    val createdAt: String = "",
 )
 
 enum class RoomRole {

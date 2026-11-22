@@ -10,6 +10,8 @@ data class UserProfile(
     val username: String,
     val displayName: String,
     val bio: String,
+    /** رمز ISO لدولة المستخدم (اختياري). */
+    val country: String? = null,
 )
 
 data class ProfileDraft(

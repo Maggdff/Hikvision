@@ -9,4 +9,7 @@ interface ProfileRepository {
 
     /** ترمي UsernameTakenException إن كان الاسم محجوزاً. */
     suspend fun createProfile(uid: String, draft: ProfileDraft)
+
+    /** يحدّث الحقول القابلة للتعديل فقط (الاسم المعروض، النبذة، الدولة). اسم المستخدم وتاريخ الميلاد ثابتان. */
+    suspend fun updateProfile(uid: String, displayName: String, bio: String, country: String?)
 }

@@ -20,7 +20,12 @@ fun errorMessageRes(code: String): Int = when (code) {
     "owner_cannot_leave_seat" -> R.string.err_owner_cannot_leave_seat
     "invalid_title" -> R.string.err_invalid_title
     "invalid_topic" -> R.string.err_invalid_topic
+    "invalid_country" -> R.string.err_invalid_country
     "voice_failed" -> R.string.err_voice_failed
     "mic_failed" -> R.string.err_mic_failed
     else -> R.string.err_unknown
 }
+
+/** اسم الدولة حسب لغة الجهاز (عربي أو إنجليزي). */
+fun countryName(c: com.voiceup.app.domain.model.Country): String =
+    if (java.util.Locale.getDefault().language == "ar") c.nameAr else c.nameEn

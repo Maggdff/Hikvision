@@ -59,14 +59,22 @@ export function buildApp(deps?: AppDeps) {
     });
 
     api.post('/rooms', async (req, reply) => {
-      const b = (req.body ?? {}) as { title?: unknown; topic?: unknown };
+      const b = (req.body ?? {}) as { title?: unknown; topic?: unknown; country?: unknown };
       if (typeof b.title !== 'string') throw badRequest('invalid_title');
       if (b.topic !== undefined && b.topic !== null && typeof b.topic !== 'string') throw badRequest('invalid_topic');
-      const room = await rooms.createRoom(req.uid, b.title, (b.topic as string | null | undefined) ?? null);
+      if (b.country !== undefined && b.country !== null && typeof b.country !== 'string') throw badRequest('invalid_country');
+      const room = await rooms.createRoom(
+        req.uid,
+        b.title,
+        (b.topic as string | null | undefined) ?? null,
+        (b.country as string | null | undefined) ?? null,
+      );
       return reply.status(201).send(room);
     });
 
-    api.get('/rooms', async () => ({ rooms: await rooms.listOpenRooms() }));
+    api.get<{ Querystring: { country?: string } }>('/rooms', async (req) => ({
+      rooms: await rooms.listOpenRooms(50, req.query.country || null),
+    }));
 
     api.get<{ Params: { id: string } }>('/rooms/:id', async (req) =>
       rooms.getRoomState(req.uid, uuidParam(req.params.id)));

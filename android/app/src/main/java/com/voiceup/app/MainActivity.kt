@@ -4,12 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,18 +18,13 @@ import com.voiceup.app.data.FirebaseAuthRepository
 import com.voiceup.app.data.FirestoreProfileRepository
 import com.voiceup.app.data.api.FirebaseIdTokenProvider
 import com.voiceup.app.data.api.HttpRoomsRepository
-import com.voiceup.app.data.demo.DemoAuthRepository
-import com.voiceup.app.data.demo.DemoProfileRepository
-import com.voiceup.app.data.demo.DemoRoomsRepository
-import com.voiceup.app.data.demo.DemoVoiceEngine
-import com.voiceup.app.data.demo.DemoWorld
 import com.voiceup.app.data.voice.LiveKitVoiceEngine
-import com.voiceup.app.domain.repository.AuthRepository
-import com.voiceup.app.domain.repository.ProfileRepository
-import com.voiceup.app.domain.repository.RoomsRepository
-import com.voiceup.app.domain.voice.VoiceEngine
+import com.voiceup.app.domain.model.UserProfile
 import com.voiceup.app.presentation.auth.AuthScreen
+import com.voiceup.app.presentation.account.AccountScreen
+import com.voiceup.app.presentation.account.AccountViewModel
 import com.voiceup.app.presentation.auth.AuthViewModel
+import com.voiceup.app.presentation.main.MainScaffold
 import com.voiceup.app.presentation.home.HomeScreen
 import com.voiceup.app.presentation.home.HomeViewModel
 import com.voiceup.app.presentation.profile.ProfileSetupScreen
@@ -46,9 +35,7 @@ import com.voiceup.app.presentation.session.SessionErrorScreen
 import com.voiceup.app.presentation.session.SessionLoadingScreen
 import com.voiceup.app.presentation.session.SessionState
 import com.voiceup.app.presentation.session.SessionViewModel
-import com.voiceup.app.presentation.shell.MainShell
 import com.voiceup.app.presentation.theme.VoiceUpTheme
-import com.voiceup.app.domain.model.UserProfile
 
 /** مصنع بسيط للـ ViewModels (حقن يدوي مؤقت قبل اعتماد حاوية تبعيات). */
 private fun <T : ViewModel> factory(create: () -> T) = object : ViewModelProvider.Factory {
@@ -58,24 +45,12 @@ private fun <T : ViewModel> factory(create: () -> T) = object : ViewModelProvide
 
 class MainActivity : ComponentActivity() {
 
-    // الوضع التجريبي (VOICEUP_DEMO=true): بيانات وهمية في الذاكرة بلا Firebase ولا خادم، لمعاينة الواجهات فقط
-    private val demo by lazy { DemoWorld() }
-    private val authRepo: AuthRepository by lazy {
-        if (BuildConfig.DEMO_MODE) DemoAuthRepository(demo) else FirebaseAuthRepository()
+    private val authRepo by lazy { FirebaseAuthRepository() }
+    private val profileRepo by lazy { FirestoreProfileRepository() }
+    private val roomsRepo by lazy {
+        val tokens = FirebaseIdTokenProvider()
+        HttpRoomsRepository(BuildConfig.API_BASE_URL) { tokens.token() }
     }
-    private val profileRepo: ProfileRepository by lazy {
-        if (BuildConfig.DEMO_MODE) DemoProfileRepository(demo) else FirestoreProfileRepository()
-    }
-    private val roomsRepo: RoomsRepository by lazy {
-        if (BuildConfig.DEMO_MODE) {
-            DemoRoomsRepository(demo)
-        } else {
-            val tokens = FirebaseIdTokenProvider()
-            HttpRoomsRepository(BuildConfig.API_BASE_URL) { tokens.token() }
-        }
-    }
-    private fun newVoiceEngine(): VoiceEngine =
-        if (BuildConfig.DEMO_MODE) DemoVoiceEngine() else LiveKitVoiceEngine(applicationContext)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -119,67 +94,74 @@ class MainActivity : ComponentActivity() {
         val uid = profile.uid
         val homeVm: HomeViewModel = viewModel(key = "home-$uid", factory = factory { HomeViewModel(roomsRepo) })
         var roomId by rememberSaveable { mutableStateOf<String?>(null) }
-        var tabIndex by rememberSaveable { mutableStateOf(0) }
         // عدّاد دخول يجعل كل دخول للغرفة ViewModel جديداً (لا حالة قديمة من زيارة سابقة)
         var entry by rememberSaveable { mutableStateOf(0) }
 
-        AnimatedContent(
-            targetState = roomId,
-            transitionSpec = {
-                if (targetState != null) {
-                    (slideInVertically { it / 5 } + fadeIn()) togetherWith fadeOut()
-                } else {
-                    fadeIn() togetherWith (slideOutVertically { it / 5 } + fadeOut())
-                }
-            },
-            label = "root",
-        ) { current ->
-            if (current == null) {
-                MainShell(
-                    profile = profile,
-                    tabIndex = tabIndex,
-                    onTab = { tabIndex = it },
-                    onSignOut = onSignOut,
-                ) {
+        val current = roomId
+        if (current == null) {
+            val accountVm: AccountViewModel = viewModel(
+                key = "account-$uid",
+                factory = factory { AccountViewModel(profile, profileRepo) },
+            )
+            MainScaffold(
+                home = {
                     val ui by homeVm.state.collectAsStateWithLifecycle()
+                    val filter by homeVm.filter.collectAsStateWithLifecycle()
                     val create by homeVm.create.collectAsStateWithLifecycle()
                     HomeScreen(
-                        userName = profile.displayName.ifBlank { profile.username },
                         state = ui,
+                        filter = filter,
                         create = create,
                         onRetry = homeVm::refresh,
+                        onSelectCountry = homeVm::setCountry,
+                        onSelectSort = homeVm::setSort,
                         onOpenRoom = { id -> entry++; roomId = id },
-                        onCreate = { title, topic -> homeVm.createRoom(title, topic) { id -> entry++; roomId = id } },
+                        onCreate = { title, topic, country ->
+                            homeVm.createRoom(title, topic, country) { id -> entry++; roomId = id }
+                        },
                         onClearCreateError = homeVm::clearCreateError,
                     )
-                }
-            } else {
-                val vm: RoomViewModel = viewModel(
-                    key = "room-$current-$entry",
-                    factory = factory {
-                        RoomViewModel(current, roomsRepo, profileRepo, newVoiceEngine())
-                    },
-                )
-                val ui by vm.state.collectAsStateWithLifecycle()
-                RoomScreen(
-                    myUid = uid,
-                    state = ui,
-                    onSetMic = vm::setMic,
-                    onRequestSeat = vm::requestSeat,
-                    onLeaveSeat = vm::leaveSeat,
-                    onLeaveRoom = vm::leaveRoom,
-                    onClose = vm::closeRoom,
-                    onDecide = vm::decide,
-                    onMute = vm::mute,
-                    onKick = vm::kick,
-                    onReconnect = vm::reconnect,
-                    onClearError = vm::clearError,
-                    onExit = {
-                        roomId = null
-                        homeVm.refresh()
-                    },
-                )
-            }
+                },
+                account = {
+                    val ui by accountVm.state.collectAsStateWithLifecycle()
+                    AccountScreen(
+                        state = ui,
+                        onEdit = accountVm::startEdit,
+                        onCancel = accountVm::cancelEdit,
+                        onSave = accountVm::save,
+                        onDisplayName = accountVm::onDisplayName,
+                        onBio = accountVm::onBio,
+                        onCountry = accountVm::onCountry,
+                        onSignOut = onSignOut,
+                    )
+                },
+            )
+        } else {
+            val vm: RoomViewModel = viewModel(
+                key = "room-$current-$entry",
+                factory = factory {
+                    RoomViewModel(current, roomsRepo, profileRepo, LiveKitVoiceEngine(applicationContext))
+                },
+            )
+            val ui by vm.state.collectAsStateWithLifecycle()
+            RoomScreen(
+                myUid = uid,
+                state = ui,
+                onSetMic = vm::setMic,
+                onRequestSeat = vm::requestSeat,
+                onLeaveSeat = vm::leaveSeat,
+                onLeaveRoom = vm::leaveRoom,
+                onClose = vm::closeRoom,
+                onDecide = vm::decide,
+                onMute = vm::mute,
+                onKick = vm::kick,
+                onReconnect = vm::reconnect,
+                onClearError = vm::clearError,
+                onExit = {
+                    roomId = null
+                    homeVm.refresh()
+                },
+            )
         }
     }
 }

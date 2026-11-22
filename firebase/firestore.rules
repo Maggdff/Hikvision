@@ -7,7 +7,6 @@ service cloud.firestore {
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
 
     // الملف العام: يقرؤه أي مستخدم مسجل، وينشئه صاحبه مرة واحدة فقط.
-    // (التعديل والحذف يُضافان لاحقاً عبر الـ Backend بعد مراجعة الحقول المسموحة.)
     match /users/{uid} {
       allow read: if signedIn();
       allow create: if isOwner(uid)
@@ -20,7 +19,18 @@ service cloud.firestore {
         && request.resource.data.bio is string
         && request.resource.data.bio.size() <= 160
         && request.resource.data.createdAt == request.time;
-      allow update, delete: if false;
+      // تعديل الملف: للمالك فقط وللحقول الثلاثة فقط (username وcreatedAt ثابتان).
+      // قائمة الدول يجب أن تطابق backend/src/rooms/countries.ts.
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'bio', 'country'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 1
+        && request.resource.data.displayName.size() <= 30
+        && request.resource.data.bio is string
+        && request.resource.data.bio.size() <= 160
+        && (!('country' in request.resource.data)
+            || request.resource.data.country in ['AE','BH','DJ','DZ','EG','IQ','JO','KM','KW','LB','LY','MA','MR','OM','PS','QA','SA','SD','SY','SO','TN','YE']);
+      allow delete: if false;
 
       // تاريخ الميلاد: للمالك فقط، يُنشأ مرة واحدة ولا يُعدَّل.
       match /private/{doc} {

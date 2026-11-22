@@ -54,6 +54,21 @@ class HttpRoomsRepositoryTest {
         assertEquals(2, rooms[0].seatedCount)
     }
 
+    @Test fun listRoomsWithCountryAddsQueryAndParsesCountryAndCreatedAt() = runBlocking {
+        server.enqueue(json("""{"rooms":[{"id":"r1","title":"غرفة","topic":null,"ownerUid":"o","seatedCount":2,"maxSeats":8,"country":"SA","createdAt":"2026-01-02T03:04:05.000Z"}]}"""))
+        val rooms = repo.getActiveRooms("SA")
+        assertEquals("/v1/rooms?country=SA", server.takeRequest().path)
+        assertEquals("SA", rooms[0].country)
+        assertEquals("2026-01-02T03:04:05.000Z", rooms[0].createdAt)
+    }
+
+    @Test fun createRoomSendsCountryWhenGiven() = runBlocking {
+        server.enqueue(json("""{"id":"r9","title":"جديدة","topic":null,"ownerUid":"me","seatedCount":1,"maxSeats":8,"country":"EG"}""", 201))
+        val room = repo.createRoom("جديدة", null, "EG")
+        assertTrue(server.takeRequest().body.readUtf8().contains("\"country\":\"EG\""))
+        assertEquals("EG", room.country)
+    }
+
     @Test fun createRoomPostsTitleAndDropsBlankTopic() = runBlocking {
         server.enqueue(json("""{"id":"r9","title":"جديدة","topic":null,"ownerUid":"me","seatedCount":1,"maxSeats":8}""", 201))
         val room = repo.createRoom("جديدة", "  ")

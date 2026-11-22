@@ -7,8 +7,9 @@ import com.voiceup.app.domain.model.VoiceRoom
 
 /** كل الدوال ترمي ApiException عند الفشل. */
 interface RoomsRepository {
-    suspend fun getActiveRooms(): List<VoiceRoom>
-    suspend fun createRoom(title: String, topic: String?): VoiceRoom
+    /** country: رمز ISO من حرفين لتصفية الغرف، أو null لكل الدول. */
+    suspend fun getActiveRooms(country: String? = null): List<VoiceRoom>
+    suspend fun createRoom(title: String, topic: String?, country: String? = null): VoiceRoom
     suspend fun getRoomState(roomId: String): RoomState
     suspend fun join(roomId: String): JoinInfo
     suspend fun closeRoom(roomId: String)

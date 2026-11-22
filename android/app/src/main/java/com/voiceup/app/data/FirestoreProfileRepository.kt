@@ -26,7 +26,18 @@ class FirestoreProfileRepository(
             username = doc.getString("username").orEmpty(),
             displayName = doc.getString("displayName").orEmpty(),
             bio = doc.getString("bio").orEmpty(),
+            country = doc.getString("country"),
         )
+    }
+
+    override suspend fun updateProfile(uid: String, displayName: String, bio: String, country: String?) {
+        db.collection("users").document(uid).update(
+            mapOf(
+                "displayName" to displayName.trim(),
+                "bio" to bio.trim(),
+                "country" to (country ?: FieldValue.delete()),
+            ),
+        ).await()
     }
 
     override suspend fun createProfile(uid: String, draft: ProfileDraft) {

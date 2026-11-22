@@ -30,6 +30,8 @@ import java.util.concurrent.TimeUnit
     val ownerUid: String,
     val seatedCount: Int = 0,
     val maxSeats: Int,
+    val country: String? = null,
+    val createdAt: String = "",
 )
 @Serializable private data class RoomListDto(val rooms: List<RoomDto>)
 @Serializable private data class SeatDto(val seat: Int, val uid: String, val role: String)
@@ -46,17 +48,17 @@ import java.util.concurrent.TimeUnit
 @Serializable private data class JoinDto(val token: String, val url: String, val role: String, val seat: Int? = null)
 @Serializable private data class SeatRequestDto(val id: String, val uid: String)
 @Serializable private data class SeatRequestListDto(val requests: List<SeatRequestDto>)
-@Serializable private data class CreateRoomBody(val title: String, val topic: String? = null)
+@Serializable private data class CreateRoomBody(val title: String, val topic: String? = null, val country: String? = null)
 @Serializable private data class KickBody(val ban: Boolean)
 
 class HttpRoomsRepository(
     private val baseUrl: String,
+    /** يوفّر Firebase ID Token الحالي، ويرمي استثناءً إن لم يكن هناك مستخدم. */
+    private val tokens: suspend () -> String,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .callTimeout(20, TimeUnit.SECONDS)
         .build(),
-    /** يوفّر Firebase ID Token الحالي، ويرمي استثناءً إن لم يكن هناك مستخدم. (آخر معامل ليعمل الـ trailing lambda) */
-    private val tokens: suspend () -> String,
 ) : RoomsRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -99,13 +101,13 @@ class HttpRoomsRepository(
         }
     }
 
-    private fun RoomDto.toDomain() = VoiceRoom(id, title, topic, ownerUid, seatedCount, maxSeats)
+    private fun RoomDto.toDomain() = VoiceRoom(id, title, topic, ownerUid, seatedCount, maxSeats, country, createdAt)
 
-    override suspend fun getActiveRooms(): List<VoiceRoom> =
-        call("GET", "/rooms") { json.decodeFromString<RoomListDto>(it).rooms.map { r -> r.toDomain() } }
+    override suspend fun getActiveRooms(country: String?): List<VoiceRoom> =
+        call("GET", if (country == null) "/rooms" else "/rooms?country=" + java.net.URLEncoder.encode(country, "UTF-8")) { json.decodeFromString<RoomListDto>(it).rooms.map { r -> r.toDomain() } }
 
-    override suspend fun createRoom(title: String, topic: String?): VoiceRoom =
-        call("POST", "/rooms", json.encodeToString(CreateRoomBody(title, topic?.ifBlank { null }))) {
+    override suspend fun createRoom(title: String, topic: String?, country: String?): VoiceRoom =
+        call("POST", "/rooms", json.encodeToString(CreateRoomBody(title, topic?.ifBlank { null }, country))) {
             json.decodeFromString<RoomDto>(it).toDomain()
         }
 
