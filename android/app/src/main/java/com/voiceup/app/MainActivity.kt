@@ -18,7 +18,16 @@ import com.voiceup.app.data.FirebaseAuthRepository
 import com.voiceup.app.data.FirestoreProfileRepository
 import com.voiceup.app.data.api.FirebaseIdTokenProvider
 import com.voiceup.app.data.api.HttpRoomsRepository
+import com.voiceup.app.data.demo.DemoAuthRepository
+import com.voiceup.app.data.demo.DemoProfileRepository
+import com.voiceup.app.data.demo.DemoRoomsRepository
+import com.voiceup.app.data.demo.DemoVoiceEngine
+import com.voiceup.app.data.demo.DemoWorld
 import com.voiceup.app.data.voice.LiveKitVoiceEngine
+import com.voiceup.app.domain.repository.AuthRepository
+import com.voiceup.app.domain.repository.ProfileRepository
+import com.voiceup.app.domain.repository.RoomsRepository
+import com.voiceup.app.domain.voice.VoiceEngine
 import com.voiceup.app.presentation.auth.AuthScreen
 import com.voiceup.app.presentation.auth.AuthViewModel
 import com.voiceup.app.presentation.home.HomeScreen
@@ -41,12 +50,24 @@ private fun <T : ViewModel> factory(create: () -> T) = object : ViewModelProvide
 
 class MainActivity : ComponentActivity() {
 
-    private val authRepo by lazy { FirebaseAuthRepository() }
-    private val profileRepo by lazy { FirestoreProfileRepository() }
-    private val roomsRepo by lazy {
-        val tokens = FirebaseIdTokenProvider()
-        HttpRoomsRepository(BuildConfig.API_BASE_URL) { tokens.token() }
+    // الوضع التجريبي (VOICEUP_DEMO=true): بيانات وهمية في الذاكرة بلا Firebase ولا خادم، لمعاينة الواجهات فقط
+    private val demo by lazy { DemoWorld() }
+    private val authRepo: AuthRepository by lazy {
+        if (BuildConfig.DEMO_MODE) DemoAuthRepository(demo) else FirebaseAuthRepository()
     }
+    private val profileRepo: ProfileRepository by lazy {
+        if (BuildConfig.DEMO_MODE) DemoProfileRepository(demo) else FirestoreProfileRepository()
+    }
+    private val roomsRepo: RoomsRepository by lazy {
+        if (BuildConfig.DEMO_MODE) {
+            DemoRoomsRepository(demo)
+        } else {
+            val tokens = FirebaseIdTokenProvider()
+            HttpRoomsRepository(BuildConfig.API_BASE_URL) { tokens.token() }
+        }
+    }
+    private fun newVoiceEngine(): VoiceEngine =
+        if (BuildConfig.DEMO_MODE) DemoVoiceEngine() else LiveKitVoiceEngine(applicationContext)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,7 +130,7 @@ class MainActivity : ComponentActivity() {
             val vm: RoomViewModel = viewModel(
                 key = "room-$current-$entry",
                 factory = factory {
-                    RoomViewModel(current, roomsRepo, profileRepo, LiveKitVoiceEngine(applicationContext))
+                    RoomViewModel(current, roomsRepo, profileRepo, newVoiceEngine())
                 },
             )
             val ui by vm.state.collectAsStateWithLifecycle()

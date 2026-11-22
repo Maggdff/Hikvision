@@ -1,0 +1,36 @@
+name: Android Demo APK
+
+# بناء APK تجريبي (بيانات وهمية، بلا Firebase ولا خادم) لمعاينة الواجهات على الهاتف
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android-demo.yml']
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    env:
+      VOICEUP_DEMO: 'true'
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build demo APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voiceup-demo-apk
+          path: android/app/build/outputs/apk/debug/*.apk
