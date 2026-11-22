@@ -4,6 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,7 +46,9 @@ import com.voiceup.app.presentation.session.SessionErrorScreen
 import com.voiceup.app.presentation.session.SessionLoadingScreen
 import com.voiceup.app.presentation.session.SessionState
 import com.voiceup.app.presentation.session.SessionViewModel
+import com.voiceup.app.presentation.shell.MainShell
 import com.voiceup.app.presentation.theme.VoiceUpTheme
+import com.voiceup.app.domain.model.UserProfile
 
 /** مصنع بسيط للـ ViewModels (حقن يدوي مؤقت قبل اعتماد حاوية تبعيات). */
 private fun <T : ViewModel> factory(create: () -> T) = object : ViewModelProvider.Factory {
@@ -102,56 +110,76 @@ class MainActivity : ComponentActivity() {
                     onSubmit = vm::submit, onSignOut = session::signOut,
                 )
             }
-            is SessionState.Ready -> Ready(s.profile.uid, session::signOut)
+            is SessionState.Ready -> Ready(s.profile, session::signOut)
         }
     }
 
     @Composable
-    private fun Ready(uid: String, onSignOut: () -> Unit) {
+    private fun Ready(profile: UserProfile, onSignOut: () -> Unit) {
+        val uid = profile.uid
         val homeVm: HomeViewModel = viewModel(key = "home-$uid", factory = factory { HomeViewModel(roomsRepo) })
         var roomId by rememberSaveable { mutableStateOf<String?>(null) }
+        var tabIndex by rememberSaveable { mutableStateOf(0) }
         // عدّاد دخول يجعل كل دخول للغرفة ViewModel جديداً (لا حالة قديمة من زيارة سابقة)
         var entry by rememberSaveable { mutableStateOf(0) }
 
-        val current = roomId
-        if (current == null) {
-            val ui by homeVm.state.collectAsStateWithLifecycle()
-            val create by homeVm.create.collectAsStateWithLifecycle()
-            HomeScreen(
-                state = ui,
-                create = create,
-                onRetry = homeVm::refresh,
-                onSignOut = onSignOut,
-                onOpenRoom = { id -> entry++; roomId = id },
-                onCreate = { title, topic -> homeVm.createRoom(title, topic) { id -> entry++; roomId = id } },
-                onClearCreateError = homeVm::clearCreateError,
-            )
-        } else {
-            val vm: RoomViewModel = viewModel(
-                key = "room-$current-$entry",
-                factory = factory {
-                    RoomViewModel(current, roomsRepo, profileRepo, newVoiceEngine())
-                },
-            )
-            val ui by vm.state.collectAsStateWithLifecycle()
-            RoomScreen(
-                myUid = uid,
-                state = ui,
-                onSetMic = vm::setMic,
-                onRequestSeat = vm::requestSeat,
-                onLeaveSeat = vm::leaveSeat,
-                onLeaveRoom = vm::leaveRoom,
-                onClose = vm::closeRoom,
-                onDecide = vm::decide,
-                onMute = vm::mute,
-                onKick = vm::kick,
-                onReconnect = vm::reconnect,
-                onClearError = vm::clearError,
-                onExit = {
-                    roomId = null
-                    homeVm.refresh()
-                },
-            )
+        AnimatedContent(
+            targetState = roomId,
+            transitionSpec = {
+                if (targetState != null) {
+                    (slideInVertically { it / 5 } + fadeIn()) togetherWith fadeOut()
+                } else {
+                    fadeIn() togetherWith (slideOutVertically { it / 5 } + fadeOut())
+                }
+            },
+            label = "root",
+        ) { current ->
+            if (current == null) {
+                MainShell(
+                    profile = profile,
+                    tabIndex = tabIndex,
+                    onTab = { tabIndex = it },
+                    onSignOut = onSignOut,
+                ) {
+                    val ui by homeVm.state.collectAsStateWithLifecycle()
+                    val create by homeVm.create.collectAsStateWithLifecycle()
+                    HomeScreen(
+                        userName = profile.displayName.ifBlank { profile.username },
+                        state = ui,
+                        create = create,
+                        onRetry = homeVm::refresh,
+                        onOpenRoom = { id -> entry++; roomId = id },
+                        onCreate = { title, topic -> homeVm.createRoom(title, topic) { id -> entry++; roomId = id } },
+                        onClearCreateError = homeVm::clearCreateError,
+                    )
+                }
+            } else {
+                val vm: RoomViewModel = viewModel(
+                    key = "room-$current-$entry",
+                    factory = factory {
+                        RoomViewModel(current, roomsRepo, profileRepo, newVoiceEngine())
+                    },
+                )
+                val ui by vm.state.collectAsStateWithLifecycle()
+                RoomScreen(
+                    myUid = uid,
+                    state = ui,
+                    onSetMic = vm::setMic,
+                    onRequestSeat = vm::requestSeat,
+                    onLeaveSeat = vm::leaveSeat,
+                    onLeaveRoom = vm::leaveRoom,
+                    onClose = vm::closeRoom,
+                    onDecide = vm::decide,
+                    onMute = vm::mute,
+                    onKick = vm::kick,
+                    onReconnect = vm::reconnect,
+                    onClearError = vm::clearError,
+                    onExit = {
+                        roomId = null
+                        homeVm.refresh()
+                    },
+                )
+            }
         }
     }
 }

@@ -16,6 +16,9 @@ object VoiceUpColors {
     val Pink = Color(0xFFEC4899)
     val OnDark = Color(0xFFF1F0FF)
     val OnDarkMuted = Color(0xFFA9A8C9)
+    val Success = Color(0xFF22C55E)
+    val Warning = Color(0xFFF59E0B)
+    val Live = Color(0xFFEF4444)
 
     val AccentGradient = Brush.linearGradient(listOf(Violet, Blue))
     val BackgroundGradient = Brush.verticalGradient(listOf(Color(0xFF1A1033), Background))
