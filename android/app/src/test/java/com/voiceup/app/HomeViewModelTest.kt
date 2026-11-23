@@ -78,7 +78,7 @@ class HomeViewModelTest {
     }
 
     private fun r(id: String, seated: Int, at: String, country: String? = null) =
-        VoiceRoom(id, "t$id", null, "o$id", seated, 8, country, at)
+        VoiceRoom(id, "t$id", null, "o$id", seated, 8, country = country, createdAt = at)
 
     @Test fun popularSortsBySeatedThenNewest() {
         repo.rooms = listOf(
