@@ -64,12 +64,12 @@ import java.util.concurrent.TimeUnit
 
 class HttpRoomsRepository(
     private val baseUrl: String,
-    /** يوفّر Firebase ID Token الحالي، ويرمي استثناءً إن لم يكن هناك مستخدم. */
-    private val tokens: suspend () -> String,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .callTimeout(20, TimeUnit.SECONDS)
         .build(),
+    /** يوفّر Firebase ID Token الحالي، ويرمي استثناءً إن لم يكن هناك مستخدم. آخر وسيط ليقبل lambda لاحقة. */
+    private val tokens: suspend () -> String,
 ) : RoomsRepository {
 
     private val json = Json { ignoreUnknownKeys = true }
