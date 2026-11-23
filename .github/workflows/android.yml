@@ -44,6 +44,10 @@ jobs:
             echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > app/debug.keystore
           fi
 
+      # الرفع عبر ZIP قد يُسقط صلاحية التنفيذ فيظهر الخطأ 126
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
 
