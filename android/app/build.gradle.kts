@@ -17,6 +17,9 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
+        // اللغات المدعومة: العربية (الافتراضية) والإنجليزية
+        resourceConfigurations += listOf("ar", "en")
+
         // عنوان الخادم يأتي من خاصية Gradle أو متغير بيئة (ليس سراً). فارغ = التطبيق يعرض "الخادم غير مُعدّ".
         val apiUrl = (project.findProperty("VOICEUP_API_URL") as String?)
             ?: System.getenv("VOICEUP_API_URL")
@@ -53,9 +56,6 @@ android {
         compose = true
         buildConfig = true
     }
-
-    // اللغات المدعومة: العربية (الافتراضية) والإنجليزية
-    androidResources { localeFilters += listOf("ar", "en") }
 }
 
 dependencies {
