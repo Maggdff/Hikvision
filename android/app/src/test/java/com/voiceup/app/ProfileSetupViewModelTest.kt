@@ -32,6 +32,7 @@ class ProfileSetupViewModelTest {
             failWith?.let { throw it }
             created += draft
         }
+        override suspend fun updateProfile(uid: String, displayName: String, bio: String, country: String?) {}
     }
 
     private val today = LocalDate.of(2026, 11, 21)
