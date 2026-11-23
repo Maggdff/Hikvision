@@ -11,6 +11,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       VOICEUP_API_URL: ${{ vars.VOICEUP_API_URL }}
     defaults:
