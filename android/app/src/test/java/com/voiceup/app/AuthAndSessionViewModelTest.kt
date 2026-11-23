@@ -46,6 +46,7 @@ class AuthAndSessionViewModelTest {
             return profile
         }
         override suspend fun createProfile(uid: String, draft: ProfileDraft) {}
+        override suspend fun updateProfile(uid: String, displayName: String, bio: String, country: String?) {}
     }
 
     private val profile = UserProfile("u1", "ali", "Ali", "")
