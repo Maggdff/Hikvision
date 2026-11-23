@@ -116,4 +116,21 @@
     <string name="account_err_name">الاسم المعروض من 1 إلى 30 حرفاً</string>
     <string name="account_err_bio">النبذة حتى 160 حرفاً</string>
     <string name="account_err_save">تعذر حفظ التعديلات. حاول مرة أخرى</string>
+    <string name="chat_hint">اكتب رسالة…</string>
+    <string name="chat_send">إرسال</string>
+    <string name="chat_empty">لا رسائل بعد. ابدأ المحادثة</string>
+    <string name="chat_me">أنا</string>
+    <string name="room_ended_wrong_password">كلمة سر الغرفة غير صحيحة</string>
+    <string name="room_ended_locked">محاولات كثيرة خاطئة. حاول لاحقاً</string>
+    <string name="err_wrong_password">كلمة السر غير صحيحة</string>
+    <string name="err_too_many_attempts">محاولات كثيرة. حاول بعد قليل</string>
+    <string name="err_rate_limited">تُرسل رسائل بسرعة كبيرة. انتظر قليلاً</string>
+    <string name="err_invalid_message">الرسالة من 1 إلى 300 حرف</string>
+    <string name="err_join_required">ادخل الغرفة أولاً</string>
+    <string name="err_invalid_password">كلمة السر يجب أن تكون 6 أرقام</string>
+    <string name="room_private_badge">خاصة</string>
+    <string name="password_title">غرفة خاصة</string>
+    <string name="password_hint">أدخل كلمة السر (6 أرقام)</string>
+    <string name="password_enter">دخول</string>
+    <string name="create_password">كلمة سر (6 أرقام، اختياري)</string>
 </resources>

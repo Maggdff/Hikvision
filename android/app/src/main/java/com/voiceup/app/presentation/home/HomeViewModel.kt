@@ -94,7 +94,13 @@ class HomeViewModel(private val rooms: RoomsRepository) : ViewModel() {
     fun clearCreateError() = _create.update { it.copy(errorCode = null) }
 
     /** عند النجاح يُستدعى onCreated بمعرّف الغرفة الجديدة. */
-    fun createRoom(title: String, topic: String, country: String? = null, onCreated: (String) -> Unit) {
+    fun createRoom(
+        title: String,
+        topic: String,
+        country: String? = null,
+        password: String? = null,
+        onCreated: (String) -> Unit,
+    ) {
         if (_create.value.creating) return
         val t = title.trim()
         if (t.length !in 3..60) {
@@ -109,10 +115,15 @@ class HomeViewModel(private val rooms: RoomsRepository) : ViewModel() {
             _create.value = CreateRoomState(errorCode = "invalid_country")
             return
         }
+        val pw = password?.takeIf { it.isNotEmpty() }
+        if (pw != null && !Regex("^[0-9]{6}$").matches(pw)) {
+            _create.value = CreateRoomState(errorCode = "invalid_password")
+            return
+        }
         _create.value = CreateRoomState(creating = true)
         viewModelScope.launch {
             try {
-                val room = rooms.createRoom(t, topic.trim().ifBlank { null }, country)
+                val room = rooms.createRoom(t, topic.trim().ifBlank { null }, country, pw)
                 _create.value = CreateRoomState()
                 onCreated(room.id)
             } catch (e: CancellationException) {

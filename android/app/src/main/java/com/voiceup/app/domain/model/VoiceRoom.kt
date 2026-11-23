@@ -8,6 +8,7 @@ data class VoiceRoom(
     val seatedCount: Int,
     val maxSeats: Int,
     val country: String? = null,
+    val isPrivate: Boolean = false,
     /** وقت الإنشاء بصيغة ISO-8601 (UTC)، وترتيبه النصي يطابق ترتيبه الزمني. */
     val createdAt: String = "",
 )
@@ -38,6 +39,8 @@ data class RoomState(
     val mySeat: Int?,
     val seats: List<SeatInfo>,
 )
+
+data class ChatMessage(val id: Long, val uid: String, val body: String, val createdAt: String)
 
 data class SeatRequest(val id: String, val uid: String)
 

@@ -20,6 +20,12 @@ fun errorMessageRes(code: String): Int = when (code) {
     "owner_cannot_leave_seat" -> R.string.err_owner_cannot_leave_seat
     "invalid_title" -> R.string.err_invalid_title
     "invalid_topic" -> R.string.err_invalid_topic
+    "wrong_password" -> R.string.err_wrong_password
+    "too_many_attempts" -> R.string.err_too_many_attempts
+    "rate_limited" -> R.string.err_rate_limited
+    "invalid_message" -> R.string.err_invalid_message
+    "join_required", "password_required" -> R.string.err_join_required
+    "invalid_password" -> R.string.err_invalid_password
     "invalid_country" -> R.string.err_invalid_country
     "voice_failed" -> R.string.err_voice_failed
     "mic_failed" -> R.string.err_mic_failed

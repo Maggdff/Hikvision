@@ -69,6 +69,44 @@ class HttpRoomsRepositoryTest {
         assertEquals("EG", room.country)
     }
 
+    @Test fun joinSendsPasswordInBodyOnlyWhenGiven() = runBlocking {
+        repeat(2) { server.enqueue(json("""{"token":"t","url":"wss://x","role":"member","seat":null}""")) }
+        repo.join("r1", "123456")
+        assertTrue(server.takeRequest().body.readUtf8().contains("\"password\":\"123456\""))
+        repo.join("r1")
+        assertTrue(!server.takeRequest().body.readUtf8().contains("password"))
+    }
+
+    @Test fun wrongPasswordCodeIsPreserved() = runBlocking {
+        server.enqueue(json("""{"error":"wrong_password"}""", 403))
+        val e = apiError { runBlocking { repo.join("r1", "000000") } }
+        assertEquals(403, e.status)
+        assertEquals("wrong_password", e.code)
+    }
+
+    @Test fun createRoomSendsPasswordAndParsesPrivateFlag() = runBlocking {
+        server.enqueue(json("""{"id":"r9","title":"خاصة","topic":null,"ownerUid":"me","seatedCount":1,"maxSeats":8,"isPrivate":true}""", 201))
+        val room = repo.createRoom("خاصة", null, null, "123456")
+        assertTrue(server.takeRequest().body.readUtf8().contains("\"password\":\"123456\""))
+        assertTrue(room.isPrivate)
+    }
+
+    @Test fun messagesEndpoints() = runBlocking {
+        server.enqueue(json("""{"messages":[{"id":5,"uid":"u","body":"مرحبا","createdAt":"x"}]}"""))
+        server.enqueue(json("""{"messages":[]}"""))
+        server.enqueue(json("""{"id":6,"uid":"me","body":"رد","createdAt":"y"}""", 201))
+        val first = repo.listMessages("r1", null)
+        assertEquals("/v1/rooms/r1/messages", server.takeRequest().path)
+        assertEquals(5L, first.single().id)
+        repo.listMessages("r1", 5)
+        assertEquals("/v1/rooms/r1/messages?after=5", server.takeRequest().path)
+        val sent = repo.sendMessage("r1", "رد")
+        val req = server.takeRequest()
+        assertEquals("POST", req.method)
+        assertTrue(req.body.readUtf8().contains("\"body\":\"رد\""))
+        assertEquals(6L, sent.id)
+    }
+
     @Test fun createRoomPostsTitleAndDropsBlankTopic() = runBlocking {
         server.enqueue(json("""{"id":"r9","title":"جديدة","topic":null,"ownerUid":"me","seatedCount":1,"maxSeats":8}""", 201))
         val room = repo.createRoom("جديدة", "  ")

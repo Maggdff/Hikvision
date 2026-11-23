@@ -1,7 +1,8 @@
 import pg from 'pg';
-import { badRequest, conflict, forbidden, notFound } from '../errors.js';
+import { badRequest, conflict, forbidden, notFound, tooManyRequests } from '../errors.js';
 import type { VoiceProvider } from '../voice.js';
 import { isSupportedCountry } from './countries.js';
+import { hashRoomPassword, isValidRoomPassword, verifyRoomPassword } from './password.js';
 
 export type Role = 'owner' | 'moderator' | 'member';
 const RANK: Record<Role, number> = { owner: 3, moderator: 2, member: 1 };
@@ -14,6 +15,14 @@ export interface RoomSummary {
   seatedCount: number;
   maxSeats: number;
   country: string | null;
+  isPrivate: boolean;
+  createdAt: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  uid: string;
+  body: string;
   createdAt: string;
 }
 
@@ -72,16 +81,27 @@ export class RoomService {
 
   private async openRoom(q: pg.Pool | pg.PoolClient, roomId: string, lock = false) {
     const r = await q.query(
-      `SELECT id, owner_uid, max_seats FROM rooms WHERE id = $1 AND status = 'open' ${lock ? 'FOR UPDATE' : ''}`,
+      `SELECT id, owner_uid, max_seats, (password_hash IS NOT NULL) AS is_private FROM rooms WHERE id = $1 AND status = 'open' ${lock ? 'FOR UPDATE' : ''}`,
       [roomId],
     );
     if (!r.rows[0]) throw notFound('room_not_found');
-    return r.rows[0] as { id: string; owner_uid: string; max_seats: number };
+    return r.rows[0] as { id: string; owner_uid: string; max_seats: number; is_private: boolean };
   }
 
   private async assertNotBanned(q: pg.Pool | pg.PoolClient, roomId: string, uid: string) {
     const r = await q.query('SELECT 1 FROM room_bans WHERE room_id = $1 AND uid = $2', [roomId, uid]);
     if (r.rowCount) throw forbidden('banned_from_room');
+  }
+
+  private async hasAccess(q: pg.Pool | pg.PoolClient, roomId: string, uid: string): Promise<boolean> {
+    if ((await this.roleOf(q, roomId, uid)) === 'owner') return true;
+    const r = await q.query('SELECT 1 FROM room_access WHERE room_id = $1 AND uid = $2', [roomId, uid]);
+    return (r.rowCount ?? 0) > 0;
+  }
+
+  /** الغرف الخاصة لا يطّلع عليها إلا من دخلها بكلمة السر (أو مالكها). */
+  private async assertPrivateAccess(q: pg.Pool | pg.PoolClient, room: { id: string; is_private: boolean }, uid: string) {
+    if (room.is_private && !(await this.hasAccess(q, room.id, uid))) throw forbidden('password_required');
   }
 
   private async requireStaff(q: pg.Pool | pg.PoolClient, roomId: string, uid: string): Promise<Role> {
@@ -105,6 +125,7 @@ export class RoomService {
     title: string,
     topic: string | null,
     country: string | null = null,
+    password: string | null = null,
     maxSeats = 8,
   ): Promise<RoomSummary> {
     const cleanTitle = title.trim();
@@ -113,13 +134,15 @@ export class RoomService {
     if (cleanTopic && cleanTopic.length > 30) throw badRequest('invalid_topic');
     const cleanCountry = country ? country.trim().toUpperCase() : null;
     if (cleanCountry && !isSupportedCountry(cleanCountry)) throw badRequest('invalid_country');
+    if (password !== null && !isValidRoomPassword(password)) throw badRequest('invalid_password');
+    const passwordHash = password === null ? null : hashRoomPassword(password);
 
     try {
       return await this.tx(async (c) => {
         const r = await c.query(
-          `INSERT INTO rooms(owner_uid, title, topic, max_seats, country) VALUES ($1,$2,$3,$4,$5)
+          `INSERT INTO rooms(owner_uid, title, topic, max_seats, country, password_hash) VALUES ($1,$2,$3,$4,$5,$6)
            RETURNING id, created_at`,
-          [uid, cleanTitle, cleanTopic, maxSeats, cleanCountry],
+          [uid, cleanTitle, cleanTopic, maxSeats, cleanCountry, passwordHash],
         );
         const id = r.rows[0].id as string;
         await c.query(`INSERT INTO room_roles(room_id, uid, role) VALUES ($1,$2,'owner')`, [id, uid]);
@@ -132,6 +155,7 @@ export class RoomService {
           seatedCount: 1,
           maxSeats,
           country: cleanCountry,
+          isPrivate: passwordHash !== null,
           createdAt: (r.rows[0].created_at as Date).toISOString(),
         };
       });
@@ -145,7 +169,7 @@ export class RoomService {
     const cc = country ? country.trim().toUpperCase() : null;
     if (cc && !isSupportedCountry(cc)) throw badRequest('invalid_country');
     const r = await this.pool.query(
-      `SELECT r.id, r.title, r.topic, r.owner_uid, r.max_seats, r.country, r.created_at,
+      `SELECT r.id, r.title, r.topic, r.owner_uid, r.max_seats, r.country, r.created_at, (r.password_hash IS NOT NULL) AS is_private,
               (SELECT count(*) FROM room_seats s WHERE s.room_id = r.id)::int AS seated
          FROM rooms r WHERE r.status = 'open' AND ($2::text IS NULL OR r.country = $2)
          ORDER BY r.created_at DESC LIMIT $1`,
@@ -159,6 +183,7 @@ export class RoomService {
       seatedCount: x.seated,
       maxSeats: x.max_seats,
       country: x.country,
+      isPrivate: x.is_private as boolean,
       createdAt: (x.created_at as Date).toISOString(),
     }));
   }
@@ -166,11 +191,13 @@ export class RoomService {
   /** حالة الغرفة للعرض: المقاعد وأدوار أصحابها، مع دور المستدعي. لا تكشف أي بيانات خاصة. */
   async getRoomState(uid: string, roomId: string) {
     const room = await this.pool.query(
-      `SELECT id, title, topic, owner_uid, max_seats FROM rooms WHERE id = $1 AND status = 'open'`,
+      `SELECT id, title, topic, owner_uid, max_seats, (password_hash IS NOT NULL) AS is_private
+         FROM rooms WHERE id = $1 AND status = 'open'`,
       [roomId],
     );
     if (!room.rows[0]) throw notFound('room_not_found');
     await this.assertNotBanned(this.pool, roomId, uid);
+    await this.assertPrivateAccess(this.pool, { id: roomId, is_private: room.rows[0].is_private as boolean }, uid);
     const seats = await this.pool.query(
       `SELECT s.seat_no, s.uid, COALESCE(r.role, 'member') AS role
          FROM room_seats s LEFT JOIN room_roles r ON r.room_id = s.room_id AND r.uid = s.uid
@@ -204,21 +231,88 @@ export class RoomService {
 
   // ---------- الانضمام ----------
 
-  async join(uid: string, roomId: string) {
-    await this.openRoom(this.pool, roomId);
+  async join(uid: string, roomId: string, password: string | null = null) {
+    const room = await this.openRoom(this.pool, roomId);
     await this.assertNotBanned(this.pool, roomId, uid);
     const role = await this.roleOf(this.pool, roomId, uid);
+    if (room.is_private && role !== 'owner') await this.checkPassword(roomId, uid, password);
+    await this.pool.query(
+      'INSERT INTO room_access(room_id, uid) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+      [roomId, uid],
+    );
     const seat = await this.pool.query('SELECT seat_no FROM room_seats WHERE room_id = $1 AND uid = $2', [roomId, uid]);
     const seatNo: number | null = seat.rows[0]?.seat_no ?? null;
     const token = await this.voice.issueToken({ roomId, uid, canPublish: seatNo !== null });
     return { token, url: this.voice.publicUrl, role, seat: seatNo };
   }
 
+  /** يتحقق من كلمة السر مع حدّ للمحاولات: 5 فاشلة/15 دقيقة لكل مستخدم، و50 فاشلة/ساعة لكل غرفة. */
+  private async checkPassword(roomId: string, uid: string, password: string | null) {
+    const lim = await this.pool.query(
+      `SELECT count(*) FILTER (WHERE uid = $2 AND at > now() - interval '15 minutes')::int AS by_user,
+              count(*) FILTER (WHERE at > now() - interval '1 hour')::int AS by_room
+         FROM room_password_failures WHERE room_id = $1`,
+      [roomId, uid],
+    );
+    if (lim.rows[0].by_user >= 5 || lim.rows[0].by_room >= 50) throw tooManyRequests('too_many_attempts');
+
+    const row = await this.pool.query('SELECT password_hash FROM rooms WHERE id = $1', [roomId]);
+    const ok = password !== null && isValidRoomPassword(password) && verifyRoomPassword(password, row.rows[0].password_hash as string);
+    if (!ok) {
+      await this.pool.query('INSERT INTO room_password_failures(room_id, uid) VALUES ($1,$2)', [roomId, uid]);
+      throw forbidden('wrong_password');
+    }
+    await this.pool.query('DELETE FROM room_password_failures WHERE room_id = $1 AND uid = $2', [roomId, uid]);
+  }
+
+  // ---------- الدردشة ----------
+
+  async postMessage(uid: string, roomId: string, body: string): Promise<ChatMessage> {
+    const text = body.trim();
+    if (text.length < 1 || text.length > 300) throw badRequest('invalid_message');
+    await this.openRoom(this.pool, roomId);
+    await this.assertNotBanned(this.pool, roomId, uid);
+    if (!(await this.hasAccess(this.pool, roomId, uid))) throw forbidden('join_required');
+    const recent = await this.pool.query(
+      `SELECT count(*)::int AS n FROM room_messages
+        WHERE room_id = $1 AND uid = $2 AND created_at > now() - interval '10 seconds'`,
+      [roomId, uid],
+    );
+    if (recent.rows[0].n >= 5) throw tooManyRequests('rate_limited');
+    const r = await this.pool.query(
+      'INSERT INTO room_messages(room_id, uid, body) VALUES ($1,$2,$3) RETURNING id, created_at',
+      [roomId, uid, text],
+    );
+    return { id: Number(r.rows[0].id), uid, body: text, createdAt: (r.rows[0].created_at as Date).toISOString() };
+  }
+
+  /** after=null: آخر 50 رسالة. after=n: ما بعد المعرّف n بترتيب تصاعدي (حتى 100). */
+  async listMessages(uid: string, roomId: string, after: number | null): Promise<ChatMessage[]> {
+    await this.openRoom(this.pool, roomId);
+    await this.assertNotBanned(this.pool, roomId, uid);
+    if (!(await this.hasAccess(this.pool, roomId, uid))) throw forbidden('join_required');
+    const r = after === null
+      ? await this.pool.query(
+          `SELECT id, uid, body, created_at FROM (
+             SELECT id, uid, body, created_at FROM room_messages WHERE room_id = $1 ORDER BY id DESC LIMIT 50
+           ) t ORDER BY id`,
+          [roomId],
+        )
+      : await this.pool.query(
+          `SELECT id, uid, body, created_at FROM room_messages WHERE room_id = $1 AND id > $2 ORDER BY id LIMIT 100`,
+          [roomId, after],
+        );
+    return r.rows.map((x) => ({
+      id: Number(x.id), uid: x.uid as string, body: x.body as string, createdAt: (x.created_at as Date).toISOString(),
+    }));
+  }
+
   // ---------- المقاعد ----------
 
   async requestSeat(uid: string, roomId: string): Promise<SeatRequest> {
-    await this.openRoom(this.pool, roomId);
+    const room = await this.openRoom(this.pool, roomId);
     await this.assertNotBanned(this.pool, roomId, uid);
+    await this.assertPrivateAccess(this.pool, room, uid);
     const seated = await this.pool.query('SELECT 1 FROM room_seats WHERE room_id = $1 AND uid = $2', [roomId, uid]);
     if (seated.rowCount) throw conflict('already_seated');
 

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -21,11 +22,6 @@ android {
             ?: System.getenv("VOICEUP_API_URL")
             ?: ""
         buildConfigField("String", "API_BASE_URL", "\"$apiUrl\"")
-
-        // وضع تجريبي: بيانات وهمية بلا Firebase ولا خادم (لمعاينة الواجهات). يُفعَّل بـ -PVOICEUP_DEMO=true أو متغير بيئة.
-        val demo = ((project.findProperty("VOICEUP_DEMO") as String?) ?: System.getenv("VOICEUP_DEMO") ?: "false")
-            .equals("true", ignoreCase = true)
-        buildConfigField("boolean", "DEMO_MODE", demo.toString())
     }
 
     // مفتاح debug ثابت (يأتي من سر GitHub في CI) حتى لا تتغير بصمة SHA-1 المسجلة في Firebase
@@ -59,8 +55,7 @@ android {
     }
 
     // اللغات المدعومة: العربية (الافتراضية) والإنجليزية
-    // (androidResources.localeFilters يحتاج AGP 8.8+؛ نستخدم resourceConfigurations المتوافق مع 8.7.3)
-    defaultConfig { resourceConfigurations += listOf("ar", "en") }
+    androidResources { localeFilters += listOf("ar", "en") }
 }
 
 dependencies {
@@ -73,7 +68,6 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(platform(libs.firebase.bom))
@@ -88,9 +82,4 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
-}
-
-// إضافة Google Services تحتاج google-services.json؛ نطبقها فقط إن وُجد الملف حتى يُبنى الوضع التجريبي بدونه
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
 }

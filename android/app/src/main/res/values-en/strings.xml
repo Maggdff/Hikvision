@@ -116,4 +116,21 @@
     <string name="account_err_name">Display name must be 1 to 30 characters</string>
     <string name="account_err_bio">Bio can be up to 160 characters</string>
     <string name="account_err_save">Could not save changes. Try again</string>
+    <string name="chat_hint">Write a message…</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_empty">No messages yet. Start the conversation</string>
+    <string name="chat_me">Me</string>
+    <string name="room_ended_wrong_password">Wrong room password</string>
+    <string name="room_ended_locked">Too many wrong attempts. Try later</string>
+    <string name="err_wrong_password">Wrong password</string>
+    <string name="err_too_many_attempts">Too many attempts. Try again shortly</string>
+    <string name="err_rate_limited">You are sending messages too fast. Wait a moment</string>
+    <string name="err_invalid_message">Message must be 1 to 300 characters</string>
+    <string name="err_join_required">Join the room first</string>
+    <string name="err_invalid_password">Password must be 6 digits</string>
+    <string name="room_private_badge">Private</string>
+    <string name="password_title">Private room</string>
+    <string name="password_hint">Enter the password (6 digits)</string>
+    <string name="password_enter">Enter</string>
+    <string name="create_password">Password (6 digits, optional)</string>
 </resources>

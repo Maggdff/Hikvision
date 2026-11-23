@@ -34,7 +34,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -49,18 +52,21 @@ import com.voiceup.app.presentation.theme.VoiceUpColors
 
 @Composable
 fun HomeScreen(
+    myUid: String,
     state: HomeUiState,
     filter: HomeFilter,
     create: CreateRoomState,
     onRetry: () -> Unit,
     onSelectCountry: (String?) -> Unit,
     onSelectSort: (RoomSort) -> Unit,
-    onOpenRoom: (String) -> Unit,
-    onCreate: (title: String, topic: String, country: String?) -> Unit,
+    onOpenRoom: (roomId: String, password: String?) -> Unit,
+    onCreate: (title: String, topic: String, country: String?, password: String?) -> Unit,
     onClearCreateError: () -> Unit,
 ) {
     var showCreate by rememberSaveable { mutableStateOf(false) }
     var showCountryFilter by rememberSaveable { mutableStateOf(false) }
+    // الغرفة الخاصة التي ينتظر دخولها كلمة سر (معرّفها فقط، لا كلمة السر)
+    var passwordFor by rememberSaveable { mutableStateOf<String?>(null) }
 
     Box(Modifier.fillMaxSize().background(VoiceUpColors.BackgroundGradient)) {
         Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
@@ -106,7 +112,10 @@ fun HomeScreen(
                         action = stringResource(R.string.home_retry),
                         onAction = onRetry,
                     )
-                    is HomeUiState.Content -> RoomGrid(state.rooms, onOpenRoom)
+                    is HomeUiState.Content -> RoomGrid(state.rooms) { room ->
+                        if (room.isPrivate && room.ownerUid != myUid) passwordFor = room.id
+                        else onOpenRoom(room.id, null)
+                    }
                 }
             }
         }
@@ -123,6 +132,12 @@ fun HomeScreen(
             allowAll = true,
             onPick = { showCountryFilter = false; onSelectCountry(it) },
             onDismiss = { showCountryFilter = false },
+        )
+    }
+    passwordFor?.let { id ->
+        PasswordDialog(
+            onSubmit = { pw -> passwordFor = null; onOpenRoom(id, pw) },
+            onDismiss = { passwordFor = null },
         )
     }
     if (showCreate) {
@@ -181,8 +196,9 @@ private fun CountryRow(name: String, selected: Boolean, onClick: () -> Unit) {
 private fun CreateRoomDialog(
     state: CreateRoomState,
     onDismiss: () -> Unit,
-    onSubmit: (String, String, String?) -> Unit,
+    onSubmit: (String, String, String?, String?) -> Unit,
 ) {
+    var password by rememberSaveable { mutableStateOf("") }
     var title by rememberSaveable { mutableStateOf("") }
     var topic by rememberSaveable { mutableStateOf("") }
     var country by rememberSaveable { mutableStateOf<String?>(null) }
@@ -202,6 +218,15 @@ private fun CreateRoomDialog(
                     label = { Text(stringResource(R.string.create_topic)) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { v -> password = v.filter { it.isDigit() }.take(6) },
+                    label = { Text(stringResource(R.string.create_password)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 OutlinedButton(onClick = { picking = true }, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         Countries.find(country)?.let { countryName(it) }
@@ -214,7 +239,7 @@ private fun CreateRoomDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onSubmit(title, topic, country) }, enabled = !state.creating) {
+            Button(onClick = { onSubmit(title, topic, country, password.ifEmpty { null }) }, enabled = !state.creating) {
                 if (state.creating) CircularProgressIndicator(Modifier.padding(2.dp), strokeWidth = 2.dp)
                 else Text(stringResource(R.string.create_submit))
             }
@@ -272,7 +297,7 @@ private val cardPalettes = listOf(
 )
 
 @Composable
-private fun RoomGrid(rooms: List<VoiceRoom>, onOpen: (String) -> Unit) {
+private fun RoomGrid(rooms: List<VoiceRoom>, onOpen: (VoiceRoom) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize(),
@@ -280,7 +305,7 @@ private fun RoomGrid(rooms: List<VoiceRoom>, onOpen: (String) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(rooms, key = { it.id }) { room -> RoomCard(room) { onOpen(room.id) } }
+        items(rooms, key = { it.id }) { room -> RoomCard(room) { onOpen(room) } }
     }
 }
 
@@ -297,6 +322,12 @@ private fun RoomCard(room: VoiceRoom, onClick: () -> Unit) {
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Column {
+            if (room.isPrivate) {
+                Text(
+                    stringResource(R.string.room_private_badge),
+                    style = MaterialTheme.typography.labelMedium, color = Color.White,
+                )
+            }
             room.topic?.let {
                 Text(
                     it, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f),
@@ -318,4 +349,28 @@ private fun RoomCard(room: VoiceRoom, onClick: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun PasswordDialog(onSubmit: (String) -> Unit, onDismiss: () -> Unit) {
+    var pw by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.password_title)) },
+        text = {
+            OutlinedTextField(
+                value = pw,
+                onValueChange = { v -> pw = v.filter { it.isDigit() }.take(6) },
+                label = { Text(stringResource(R.string.password_hint)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onSubmit(pw) }, enabled = pw.length == 6) { Text(stringResource(R.string.password_enter)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }

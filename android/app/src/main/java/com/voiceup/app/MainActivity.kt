@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -96,6 +97,8 @@ class MainActivity : ComponentActivity() {
         var roomId by rememberSaveable { mutableStateOf<String?>(null) }
         // عدّاد دخول يجعل كل دخول للغرفة ViewModel جديداً (لا حالة قديمة من زيارة سابقة)
         var entry by rememberSaveable { mutableStateOf(0) }
+        // كلمة سر الغرفة الخاصة تبقى في الذاكرة فقط (لا تُحفظ في الحالة المحفوظة)
+        var roomPassword by remember { mutableStateOf<String?>(null) }
 
         val current = roomId
         if (current == null) {
@@ -109,15 +112,16 @@ class MainActivity : ComponentActivity() {
                     val filter by homeVm.filter.collectAsStateWithLifecycle()
                     val create by homeVm.create.collectAsStateWithLifecycle()
                     HomeScreen(
+                        myUid = uid,
                         state = ui,
                         filter = filter,
                         create = create,
                         onRetry = homeVm::refresh,
                         onSelectCountry = homeVm::setCountry,
                         onSelectSort = homeVm::setSort,
-                        onOpenRoom = { id -> entry++; roomId = id },
-                        onCreate = { title, topic, country ->
-                            homeVm.createRoom(title, topic, country) { id -> entry++; roomId = id }
+                        onOpenRoom = { id, password -> entry++; roomPassword = password; roomId = id },
+                        onCreate = { title, topic, country, password ->
+                            homeVm.createRoom(title, topic, country, password) { id -> entry++; roomPassword = null; roomId = id }
                         },
                         onClearCreateError = homeVm::clearCreateError,
                     )
@@ -140,7 +144,10 @@ class MainActivity : ComponentActivity() {
             val vm: RoomViewModel = viewModel(
                 key = "room-$current-$entry",
                 factory = factory {
-                    RoomViewModel(current, roomsRepo, profileRepo, LiveKitVoiceEngine(applicationContext))
+                    RoomViewModel(
+                        current, roomsRepo, profileRepo, LiveKitVoiceEngine(applicationContext),
+                        password = roomPassword,
+                    )
                 },
             )
             val ui by vm.state.collectAsStateWithLifecycle()
@@ -157,8 +164,10 @@ class MainActivity : ComponentActivity() {
                 onKick = vm::kick,
                 onReconnect = vm::reconnect,
                 onClearError = vm::clearError,
+                onSendMessage = vm::sendMessage,
                 onExit = {
                     roomId = null
+                    roomPassword = null
                     homeVm.refresh()
                 },
             )

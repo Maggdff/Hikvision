@@ -138,4 +138,23 @@ class HomeViewModelTest {
         assertEquals("new-room", created)
         assertTrue(repo.calls.contains("create:غرفة جديدة:null:SA"))
     }
+
+    @Test fun passwordMustBeSixDigitsOrEmpty() {
+        val vm = HomeViewModel(repo)
+        var created: String? = null
+        for (bad in listOf("12345", "1234567", "abcdef")) {
+            vm.createRoom("غرفة جديدة", "", null, bad) { created = it }
+            assertEquals(bad, "invalid_password", vm.create.value.errorCode)
+        }
+        assertNull(created)
+        assertTrue(repo.calls.none { it.startsWith("create") })
+    }
+
+    @Test fun validPasswordIsSentAndEmptyMeansPublic() {
+        val vm = HomeViewModel(repo)
+        vm.createRoom("غرفة خاصة", "", null, "123456") { }
+        assertEquals("123456", repo.lastCreatePassword)
+        vm.createRoom("غرفة عامة", "", null, "") { }
+        assertNull(repo.lastCreatePassword)
+    }
 }

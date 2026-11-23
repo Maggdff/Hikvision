@@ -14,9 +14,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -26,9 +30,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.voiceup.app.R
+import com.voiceup.app.domain.model.ChatMessage
 import com.voiceup.app.domain.model.RoomRole
 import com.voiceup.app.domain.model.SeatInfo
 import com.voiceup.app.domain.voice.VoiceState
@@ -72,6 +80,7 @@ fun RoomScreen(
     onKick: (uid: String, ban: Boolean) -> Unit,
     onReconnect: () -> Unit,
     onClearError: () -> Unit,
+    onSendMessage: (text: String, onSent: () -> Unit) -> Unit,
     onExit: () -> Unit,
 ) {
     BackHandler(enabled = state.end == null) {
@@ -93,7 +102,7 @@ fun RoomScreen(
             else -> RoomContent(
                 myUid, state, room.title, room.topic, room.maxSeats, room.myRole, room.mySeat, room.seats,
                 onSetMic, onRequestSeat, onLeaveSeat, onLeaveRoom, onClose, onDecide, onMute, onKick,
-                onReconnect, onClearError, onExit,
+                onReconnect, onClearError, onSendMessage, onExit,
             )
         }
     }
@@ -112,6 +121,8 @@ private fun EndedView(end: RoomEnd, onExit: () -> Unit) {
                     RoomEnd.Closed -> R.string.room_ended_closed
                     RoomEnd.Banned -> R.string.room_ended_banned
                     RoomEnd.LoadFailed -> R.string.room_ended_failed
+                    RoomEnd.WrongPassword -> R.string.room_ended_wrong_password
+                    RoomEnd.TooManyAttempts -> R.string.room_ended_locked
                 }
             ),
             style = MaterialTheme.typography.titleLarge,
@@ -141,6 +152,7 @@ private fun RoomContent(
     onKick: (String, Boolean) -> Unit,
     onReconnect: () -> Unit,
     onClearError: () -> Unit,
+    onSendMessage: (String, () -> Unit) -> Unit,
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -221,6 +233,14 @@ private fun RoomContent(
                 )
             }
         }
+
+        ChatPanel(
+            messages = state.messages,
+            names = state.names,
+            myUid = myUid,
+            sending = state.sending,
+            onSend = onSendMessage,
+        )
 
         // طلبات التحدث (للمشرفين)
         if (myRole.isStaff && state.requests.isNotEmpty()) {
@@ -348,6 +368,68 @@ private fun SeatCell(name: String?, role: RoomRole?, speaking: Boolean, onClick:
                 style = MaterialTheme.typography.labelSmall,
                 color = VoiceUpColors.Pink,
             )
+        }
+    }
+}
+
+@Composable
+private fun ChatPanel(
+    messages: List<ChatMessage>,
+    names: Map<String, String>,
+    myUid: String,
+    sending: Boolean,
+    onSend: (String, () -> Unit) -> Unit,
+) {
+    var draft by rememberSaveable { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    LaunchedEffect(messages.lastOrNull()?.id) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    }
+
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            if (messages.isEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.chat_empty),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+            items(messages, key = { it.id }) { m ->
+                val name = if (m.uid == myUid) stringResource(R.string.chat_me) else (names[m.uid] ?: m.uid.take(6))
+                Text(
+                    text = "$name: ${m.body}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (m.uid == myUid) VoiceUpColors.Blue else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(vertical = 2.dp),
+                )
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it.take(300) },
+                placeholder = { Text(stringResource(R.string.chat_hint)) },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            Button(
+                onClick = { onSend(draft) { draft = "" } },
+                enabled = draft.isNotBlank() && !sending,
+            ) { Text(stringResource(R.string.chat_send)) }
         }
     }
 }

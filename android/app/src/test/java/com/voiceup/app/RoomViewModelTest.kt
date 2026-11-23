@@ -1,6 +1,7 @@
 package com.voiceup.app
 
 import com.voiceup.app.domain.model.ApiException
+import com.voiceup.app.domain.model.ChatMessage
 import com.voiceup.app.domain.model.RoomRole
 import com.voiceup.app.domain.model.SeatInfo
 import com.voiceup.app.domain.model.SeatRequest
@@ -227,5 +228,91 @@ class RoomViewModelTest {
         val v = vm()
         voice.speaking.value = setOf("owner-uid")
         assertEquals(setOf("owner-uid"), v.state.value.speaking)
+    }
+
+    // ---------- الغرف الخاصة ----------
+
+    private fun privateVm(pw: String? = "123456") =
+        RoomViewModel("room-1", repo, profiles, voice, pollMillis = 1_000_000, password = pw)
+
+    @Test fun privateRoomJoinsWithPasswordBeforeLoadingState() {
+        val v = privateVm()
+        assertEquals("123456", repo.lastJoinPassword)
+        assertNull(v.state.value.end)
+        assertEquals(listOf("wss://voice.test" to "token-1"), voice.connects)
+        // دخول واحد فقط: الرمز المحصَّل مسبقاً يُعاد استعماله ولا يُطلب ثانية
+        assertEquals(1, repo.calls.count { it == "join" })
+    }
+
+    @Test fun wrongPasswordEndsSessionWithoutVoice() {
+        repo.joinError = ApiException(403, "wrong_password")
+        val v = privateVm("000000")
+        assertEquals(RoomEnd.WrongPassword, v.state.value.end)
+        assertTrue(voice.connects.isEmpty())
+    }
+
+    @Test fun lockedOutShowsTooManyAttempts() {
+        repo.joinError = ApiException(429, "too_many_attempts")
+        assertEquals(RoomEnd.TooManyAttempts, privateVm().state.value.end)
+    }
+
+    @Test fun publicRoomDoesNotSendAPassword() {
+        vm()
+        assertNull(repo.lastJoinPassword)
+    }
+
+    // ---------- الدردشة ----------
+
+    @Test fun enteringLoadsExistingMessagesAndResolvesSenderNames() {
+        repo.messages = listOf(ChatMessage(1, "u2", "مرحبا", ""), ChatMessage(2, "owner-uid", "أهلاً", ""))
+        val s = vm().state.value
+        assertEquals(listOf("مرحبا", "أهلاً"), s.messages.map { it.body })
+        assertEquals("سارة", s.names["u2"])
+    }
+
+    @Test fun refreshMessagesAppendsOnlyNewOnesInOrderWithoutDuplicates() = runTest {
+        repo.messages = listOf(ChatMessage(1, "u2", "a", ""))
+        val v = vm()
+        repo.messages = repo.messages + ChatMessage(2, "u2", "b", "") + ChatMessage(3, "u2", "c", "")
+        v.refreshMessages()
+        v.refreshMessages()
+        assertEquals(listOf(1L, 2L, 3L), v.state.value.messages.map { it.id })
+    }
+
+    @Test fun sendMessageTrimsCallsRepoAndNotifiesSuccess() {
+        val v = vm()
+        var sent = false
+        v.sendMessage("  مرحبا بالجميع  ") { sent = true }
+        assertTrue(sent)
+        assertEquals(listOf("مرحبا بالجميع"), repo.sentMessages)
+        assertEquals("مرحبا بالجميع", v.state.value.messages.last().body)
+        assertFalse(v.state.value.sending)
+    }
+
+    @Test fun blankOrOverlongMessageIsNotSent() {
+        val v = vm()
+        var sent = false
+        v.sendMessage("   ") { sent = true }
+        v.sendMessage("ا".repeat(301)) { sent = true }
+        assertFalse(sent)
+        assertTrue(repo.sentMessages.isEmpty())
+    }
+
+    @Test fun failedSendKeepsDraftAndShowsError() {
+        val v = vm()
+        repo.messageError = ApiException(429, "rate_limited")
+        var sent = false
+        v.sendMessage("x") { sent = true }
+        assertFalse(sent)
+        assertEquals("rate_limited", v.state.value.errorCode)
+        assertFalse(v.state.value.sending)
+        assertNull(v.state.value.end)
+    }
+
+    @Test fun banDuringChatEndsSession() = runTest {
+        val v = vm()
+        repo.messageError = ApiException(403, "banned_from_room")
+        v.refreshMessages()
+        assertEquals(RoomEnd.Banned, v.state.value.end)
     }
 }

@@ -97,6 +97,155 @@ d('rooms API (Postgres)', () => {
     expect((await call('uid-a', 'GET', '/rooms')).json().rooms).toHaveLength(0);
   });
 
+  describe('private rooms', () => {
+    async function makePrivate(owner = 'uid-owner', password = '123456') {
+      const res = await call(owner, 'POST', '/rooms', { title: 'غرفة خاصة', password });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().isPrivate).toBe(true);
+      return res.json().id as string;
+    }
+
+    it('never exposes the password or hash and flags the room as private', async () => {
+      const id = await makePrivate();
+      const list = (await call('uid-x', 'GET', '/rooms')).json().rooms[0];
+      expect(list.isPrivate).toBe(true);
+      expect(JSON.stringify(list)).not.toMatch(/123456|scrypt|password/i);
+      const row = await pool.query('SELECT password_hash FROM rooms WHERE id = $1', [id]);
+      expect(row.rows[0].password_hash).toMatch(/^scrypt\$/);
+      expect(row.rows[0].password_hash).not.toContain('123456');
+    });
+
+    it('rejects passwords that are not exactly 6 digits', async () => {
+      for (const password of ['12345', '1234567', 'abcdef', '12 456', '']) {
+        const r = await call('uid-a', 'POST', '/rooms', { title: 'غرفة', password });
+        expect(r.statusCode, password).toBe(400);
+        expect(r.json().error).toBe('invalid_password');
+      }
+      expect((await call('uid-a', 'POST', '/rooms', { title: 'غرفة', password: 123456 })).statusCode).toBe(400);
+    });
+
+    it('requires the right password to join, owner is exempt', async () => {
+      const id = await makePrivate();
+      expect((await call('uid-owner', 'POST', `/rooms/${id}/join`)).statusCode).toBe(200);
+      const none = await call('uid-u', 'POST', `/rooms/${id}/join`);
+      expect(none.statusCode).toBe(403);
+      expect(none.json().error).toBe('wrong_password');
+      expect((await call('uid-u', 'POST', `/rooms/${id}/join`, { password: '000000' })).statusCode).toBe(403);
+      const ok = await call('uid-u', 'POST', `/rooms/${id}/join`, { password: '123456' });
+      expect(ok.statusCode).toBe(200);
+      expect(ok.json().token).toBeTruthy();
+    });
+
+    it('hides state and seat requests until the password was accepted', async () => {
+      const id = await makePrivate();
+      const state = await call('uid-u', 'GET', `/rooms/${id}`);
+      expect(state.statusCode).toBe(403);
+      expect(state.json().error).toBe('password_required');
+      expect((await call('uid-u', 'POST', `/rooms/${id}/seat-requests`)).statusCode).toBe(403);
+      await call('uid-u', 'POST', `/rooms/${id}/join`, { password: '123456' });
+      expect((await call('uid-u', 'GET', `/rooms/${id}`)).statusCode).toBe(200);
+      expect((await call('uid-u', 'POST', `/rooms/${id}/seat-requests`)).statusCode).toBe(201);
+    });
+
+    it('locks a user out after 5 wrong attempts, even with the right password', async () => {
+      const id = await makePrivate();
+      for (let i = 0; i < 5; i++) {
+        expect((await call('uid-u', 'POST', `/rooms/${id}/join`, { password: '999999' })).statusCode).toBe(403);
+      }
+      const locked = await call('uid-u', 'POST', `/rooms/${id}/join`, { password: '123456' });
+      expect(locked.statusCode).toBe(429);
+      expect(locked.json().error).toBe('too_many_attempts');
+      // مستخدم آخر غير متأثر
+      expect((await call('uid-v', 'POST', `/rooms/${id}/join`, { password: '123456' })).statusCode).toBe(200);
+    });
+
+    it('locks the whole room after 50 failed attempts by many users', async () => {
+      const id = await makePrivate();
+      for (let i = 0; i < 50; i++) {
+        await pool.query('INSERT INTO room_password_failures(room_id, uid) VALUES ($1,$2)', [id, `uid-bot${i}`]);
+      }
+      const r = await call('uid-new', 'POST', `/rooms/${id}/join`, { password: '123456' });
+      expect(r.statusCode).toBe(429);
+    });
+
+    it('a successful join clears that user failures', async () => {
+      const id = await makePrivate();
+      for (let i = 0; i < 3; i++) await call('uid-u', 'POST', `/rooms/${id}/join`, { password: '111111' });
+      await call('uid-u', 'POST', `/rooms/${id}/join`, { password: '123456' });
+      const n = await pool.query('SELECT count(*)::int AS n FROM room_password_failures WHERE uid = $1', ['uid-u']);
+      expect(n.rows[0].n).toBe(0);
+    });
+
+    it('banned users cannot try the password', async () => {
+      const id = await makePrivate();
+      await call('uid-u', 'POST', `/rooms/${id}/join`, { password: '123456' });
+      await seatUser(id, 'uid-u');
+      await call('uid-owner', 'POST', `/rooms/${id}/members/uid-u/kick`, { ban: true });
+      const r = await call('uid-u', 'POST', `/rooms/${id}/join`, { password: '123456' });
+      expect(r.statusCode).toBe(403);
+      expect(r.json().error).toBe('banned_from_room');
+    });
+  });
+
+  describe('room chat', () => {
+    it('requires joining first, then posts and lists in order', async () => {
+      const id = await makeRoom();
+      const early = await call('uid-u', 'POST', `/rooms/${id}/messages`, { body: 'مرحبا' });
+      expect(early.statusCode).toBe(403);
+      expect(early.json().error).toBe('join_required');
+      expect((await call('uid-u', 'GET', `/rooms/${id}/messages`)).statusCode).toBe(403);
+
+      await call('uid-u', 'POST', `/rooms/${id}/join`);
+      const m1 = await call('uid-u', 'POST', `/rooms/${id}/messages`, { body: '  مرحبا  ' });
+      expect(m1.statusCode).toBe(201);
+      expect(m1.json().body).toBe('مرحبا');
+      const m2 = await call('uid-owner', 'POST', `/rooms/${id}/messages`, { body: 'أهلاً' });
+      expect(m2.statusCode).toBe(201);
+
+      const all = (await call('uid-u', 'GET', `/rooms/${id}/messages`)).json().messages;
+      expect(all.map((m: { body: string }) => m.body)).toEqual(['مرحبا', 'أهلاً']);
+      const afterFirst = (await call('uid-u', 'GET', `/rooms/${id}/messages?after=${m1.json().id}`)).json().messages;
+      expect(afterFirst.map((m: { uid: string }) => m.uid)).toEqual(['uid-owner']);
+      expect((await call('uid-u', 'GET', `/rooms/${id}/messages?after=abc`)).statusCode).toBe(400);
+    });
+
+    it('rejects empty and over-long messages', async () => {
+      const id = await makeRoom();
+      for (const body of ['', '   ', 'ا'.repeat(301)]) {
+        const r = await call('uid-owner', 'POST', `/rooms/${id}/messages`, { body });
+        expect(r.statusCode).toBe(400);
+        expect(r.json().error).toBe('invalid_message');
+      }
+      expect((await call('uid-owner', 'POST', `/rooms/${id}/messages`, { body: 5 })).statusCode).toBe(400);
+      expect((await call('uid-owner', 'POST', `/rooms/${id}/messages`, { body: 'ا'.repeat(300) })).statusCode).toBe(201);
+    });
+
+    it('rate limits to 5 messages per 10 seconds per user', async () => {
+      const id = await makeRoom();
+      for (let i = 0; i < 5; i++) {
+        expect((await call('uid-owner', 'POST', `/rooms/${id}/messages`, { body: `m${i}` })).statusCode).toBe(201);
+      }
+      const r = await call('uid-owner', 'POST', `/rooms/${id}/messages`, { body: 'سادسة' });
+      expect(r.statusCode).toBe(429);
+      expect(r.json().error).toBe('rate_limited');
+    });
+
+    it('banned users cannot read or write', async () => {
+      const id = await makeRoom();
+      await call('uid-u', 'POST', `/rooms/${id}/join`);
+      await seatUser(id, 'uid-u');
+      await call('uid-owner', 'POST', `/rooms/${id}/members/uid-u/kick`, { ban: true });
+      expect((await call('uid-u', 'POST', `/rooms/${id}/messages`, { body: 'x' })).statusCode).toBe(403);
+      expect((await call('uid-u', 'GET', `/rooms/${id}/messages`)).statusCode).toBe(403);
+    });
+
+    it('closed rooms refuse chat', async () => {
+      const id = await makeRoom();
+      await call('uid-owner', 'POST', `/rooms/${id}/close`);
+      expect((await call('uid-owner', 'POST', `/rooms/${id}/messages`, { body: 'x' })).statusCode).toBe(404);
+    });
+  });
+
   it('rejects missing or invalid tokens', async () => {
     expect((await call(null, 'GET', '/rooms')).statusCode).toBe(401);
     expect((await call('garbage', 'GET', '/rooms')).statusCode).toBe(401);

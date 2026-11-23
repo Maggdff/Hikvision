@@ -1,6 +1,7 @@
 package com.voiceup.app
 
 import com.voiceup.app.domain.model.ApiException
+import com.voiceup.app.domain.model.ChatMessage
 import com.voiceup.app.domain.model.JoinInfo
 import com.voiceup.app.domain.model.ProfileDraft
 import com.voiceup.app.domain.model.RoomRole
@@ -30,6 +31,11 @@ class FakeRoomsRepository : RoomsRepository {
     val calls = mutableListOf<String>()
     var listRequestsCalls = 0
     var lastCountryFilter: String? = null
+    var lastJoinPassword: String? = null
+    var lastCreatePassword: String? = null
+    var messages: List<ChatMessage> = emptyList()
+    var messageError: ApiException? = null
+    val sentMessages = mutableListOf<String>()
     var listCalls = 0
 
     private fun action(name: String) {
@@ -44,8 +50,9 @@ class FakeRoomsRepository : RoomsRepository {
         return if (country == null) rooms else rooms.filter { it.country == country }
     }
 
-    override suspend fun createRoom(title: String, topic: String?, country: String?): VoiceRoom {
+    override suspend fun createRoom(title: String, topic: String?, country: String?, password: String?): VoiceRoom {
         calls += "create:$title:$topic:$country"
+        lastCreatePassword = password
         createError?.let { throw it }
         return VoiceRoom("new-room", title, topic, "me", 1, 8, country)
     }
@@ -55,7 +62,21 @@ class FakeRoomsRepository : RoomsRepository {
         return state
     }
 
-    override suspend fun join(roomId: String): JoinInfo {
+    override suspend fun listMessages(roomId: String, afterId: Long?): List<ChatMessage> {
+        messageError?.let { throw it }
+        return if (afterId == null) messages else messages.filter { it.id > afterId }
+    }
+
+    override suspend fun sendMessage(roomId: String, body: String): ChatMessage {
+        messageError?.let { throw it }
+        sentMessages += body
+        val m = ChatMessage((messages.maxOfOrNull { it.id } ?: 0L) + 1, "me", body, "")
+        messages = messages + m
+        return m
+    }
+
+    override suspend fun join(roomId: String, password: String?): JoinInfo {
+        lastJoinPassword = password
         calls += "join"
         joinError?.let { throw it }
         return joinInfo
