@@ -33,6 +33,7 @@ import com.voiceup.app.domain.model.Countries
 import com.voiceup.app.presentation.countryName
 import com.voiceup.app.presentation.home.CountryPickerDialog
 import com.voiceup.app.presentation.theme.VoiceUpColors
+import com.voiceup.app.presentation.theme.appBackground
 
 @Composable
 fun AccountScreen(
@@ -51,7 +52,7 @@ fun AccountScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(VoiceUpColors.BackgroundGradient)
+            .background(appBackground())
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),

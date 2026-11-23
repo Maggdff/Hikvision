@@ -18,6 +18,7 @@ data class AuthUiState(
     val isSignUp: Boolean = false,
     val loading: Boolean = false,
     val error: AuthError? = null,
+    val errorDetail: String? = null,
 )
 
 class AuthViewModel(private val auth: AuthRepository) : ViewModel() {
@@ -25,9 +26,9 @@ class AuthViewModel(private val auth: AuthRepository) : ViewModel() {
     private val _state = MutableStateFlow(AuthUiState())
     val state: StateFlow<AuthUiState> = _state.asStateFlow()
 
-    fun onEmail(v: String) = _state.update { it.copy(email = v, error = null) }
-    fun onPassword(v: String) = _state.update { it.copy(password = v, error = null) }
-    fun toggleMode() = _state.update { it.copy(isSignUp = !it.isSignUp, error = null) }
+    fun onEmail(v: String) = _state.update { it.copy(email = v, error = null, errorDetail = null) }
+    fun onPassword(v: String) = _state.update { it.copy(password = v, error = null, errorDetail = null) }
+    fun toggleMode() = _state.update { it.copy(isSignUp = !it.isSignUp, error = null, errorDetail = null) }
 
     fun submit() {
         val s = _state.value
@@ -46,9 +47,11 @@ class AuthViewModel(private val auth: AuthRepository) : ViewModel() {
                 if (s.isSignUp) auth.signUp(s.email, s.password) else auth.signIn(s.email, s.password)
                 _state.update { it.copy(loading = false) }
             } catch (e: AuthException) {
-                _state.update { it.copy(loading = false, error = e.error) }
+                _state.update { it.copy(loading = false, error = e.error, errorDetail = e.detail) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = AuthError.Unknown) }
+                _state.update {
+                    it.copy(loading = false, error = AuthError.Unknown, errorDetail = "${e.javaClass.simpleName}: ${e.message.orEmpty().take(160)}")
+                }
             }
         }
     }

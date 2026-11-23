@@ -133,4 +133,6 @@
     <string name="password_hint">Enter the password (6 digits)</string>
     <string name="password_enter">Enter</string>
     <string name="create_password">Password (6 digits, optional)</string>
+    <string name="auth_error_not_enabled">Email sign-in is not enabled in Firebase settings</string>
+    <string name="auth_error_detail">Technical details: %1$s</string>
 </resources>

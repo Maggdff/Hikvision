@@ -24,7 +24,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.voiceup.app.R
 import com.voiceup.app.domain.model.AuthError
-import com.voiceup.app.presentation.theme.VoiceUpColors
+import com.voiceup.app.presentation.theme.appBackground
 
 @Composable
 fun AuthScreen(
@@ -37,7 +37,7 @@ fun AuthScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(VoiceUpColors.BackgroundGradient)
+            .background(appBackground())
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
@@ -74,6 +74,13 @@ fun AuthScreen(
         )
         state.error?.let {
             Text(stringResource(errorRes(it)), color = MaterialTheme.colorScheme.error)
+            state.errorDetail?.let { d ->
+                Text(
+                    stringResource(R.string.auth_error_detail, d),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Button(onClick = onSubmit, enabled = !state.loading, modifier = Modifier.fillMaxWidth()) {
             if (state.loading) {
@@ -94,5 +101,6 @@ private fun errorRes(e: AuthError): Int = when (e) {
     AuthError.WeakPassword -> R.string.auth_error_weak_password
     AuthError.InvalidEmail -> R.string.auth_error_invalid_email
     AuthError.Network -> R.string.auth_error_network
+    AuthError.NotEnabled -> R.string.auth_error_not_enabled
     AuthError.Unknown -> R.string.auth_error_unknown
 }

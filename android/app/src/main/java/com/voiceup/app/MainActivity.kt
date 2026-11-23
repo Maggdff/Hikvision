@@ -151,26 +151,28 @@ class MainActivity : ComponentActivity() {
                 },
             )
             val ui by vm.state.collectAsStateWithLifecycle()
-            RoomScreen(
-                myUid = uid,
-                state = ui,
-                onSetMic = vm::setMic,
-                onRequestSeat = vm::requestSeat,
-                onLeaveSeat = vm::leaveSeat,
-                onLeaveRoom = vm::leaveRoom,
-                onClose = vm::closeRoom,
-                onDecide = vm::decide,
-                onMute = vm::mute,
-                onKick = vm::kick,
-                onReconnect = vm::reconnect,
-                onClearError = vm::clearError,
-                onSendMessage = vm::sendMessage,
-                onExit = {
-                    roomId = null
-                    roomPassword = null
-                    homeVm.refresh()
-                },
-            )
+            VoiceUpTheme(dark = true) {
+                RoomScreen(
+                    myUid = uid,
+                    state = ui,
+                    onSetMic = vm::setMic,
+                    onRequestSeat = vm::requestSeat,
+                    onLeaveSeat = vm::leaveSeat,
+                    onLeaveRoom = vm::leaveRoom,
+                    onClose = vm::closeRoom,
+                    onDecide = vm::decide,
+                    onMute = vm::mute,
+                    onKick = vm::kick,
+                    onReconnect = vm::reconnect,
+                    onClearError = vm::clearError,
+                    onSendMessage = vm::sendMessage,
+                    onExit = {
+                        roomId = null
+                        roomPassword = null
+                        homeVm.refresh()
+                    },
+                )
+            }
         }
     }
 }

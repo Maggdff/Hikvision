@@ -15,12 +15,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.voiceup.app.R
-import com.voiceup.app.presentation.theme.VoiceUpColors
+import com.voiceup.app.presentation.theme.appBackground
 
 @Composable
 fun SessionLoadingScreen() {
     Box(
-        Modifier.fillMaxSize().background(VoiceUpColors.BackgroundGradient),
+        Modifier.fillMaxSize().background(appBackground()),
         contentAlignment = Alignment.Center,
     ) { CircularProgressIndicator() }
 }
@@ -28,7 +28,7 @@ fun SessionLoadingScreen() {
 @Composable
 fun SessionErrorScreen(onRetry: () -> Unit, onSignOut: () -> Unit) {
     Box(
-        Modifier.fillMaxSize().background(VoiceUpColors.BackgroundGradient),
+        Modifier.fillMaxSize().background(appBackground()),
         contentAlignment = Alignment.Center,
     ) {
         Column(

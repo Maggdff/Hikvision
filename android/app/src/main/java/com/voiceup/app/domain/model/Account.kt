@@ -21,8 +21,9 @@ data class ProfileDraft(
     val birthDate: LocalDate,
 )
 
-enum class AuthError { InvalidCredentials, EmailInUse, WeakPassword, InvalidEmail, Network, Unknown }
+enum class AuthError { InvalidCredentials, EmailInUse, WeakPassword, InvalidEmail, Network, NotEnabled, Unknown }
 
-class AuthException(val error: AuthError) : Exception(error.name)
+/** detail: رمز/وصف تقني للمطوّر (مثل ERROR_OPERATION_NOT_ALLOWED)، لا يحوي بيانات المستخدم. */
+class AuthException(val error: AuthError, val detail: String? = null) : Exception(error.name)
 
 class UsernameTakenException : Exception("username taken")

@@ -24,7 +24,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.voiceup.app.R
-import com.voiceup.app.presentation.theme.VoiceUpColors
+import com.voiceup.app.presentation.theme.appBackground
 
 @Composable
 fun ProfileSetupScreen(
@@ -41,7 +41,7 @@ fun ProfileSetupScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(VoiceUpColors.BackgroundGradient)
+            .background(appBackground())
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(24.dp),

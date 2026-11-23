@@ -133,4 +133,6 @@
     <string name="password_hint">أدخل كلمة السر (6 أرقام)</string>
     <string name="password_enter">دخول</string>
     <string name="create_password">كلمة سر (6 أرقام، اختياري)</string>
+    <string name="auth_error_not_enabled">تسجيل الدخول بالبريد غير مفعّل في إعدادات Firebase</string>
+    <string name="auth_error_detail">التفاصيل التقنية: %1$s</string>
 </resources>

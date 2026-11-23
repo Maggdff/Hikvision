@@ -2,6 +2,7 @@ package com.voiceup.app.data
 
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
@@ -43,14 +44,21 @@ class FirebaseAuthRepository(private val auth: FirebaseAuth = FirebaseAuth.getIn
 
     override fun signOut() = auth.signOut()
 
-    private fun map(e: Exception): AuthException = AuthException(
-        when (e) {
-            is FirebaseAuthUserCollisionException -> AuthError.EmailInUse
-            is FirebaseAuthWeakPasswordException -> AuthError.WeakPassword
-            is FirebaseAuthInvalidUserException,
-            is FirebaseAuthInvalidCredentialsException -> AuthError.InvalidCredentials
-            is FirebaseNetworkException -> AuthError.Network
+    private fun map(e: Exception): AuthException {
+        val code = (e as? FirebaseAuthException)?.errorCode
+        val error = when {
+            e is FirebaseAuthUserCollisionException -> AuthError.EmailInUse
+            e is FirebaseAuthWeakPasswordException -> AuthError.WeakPassword
+            e is FirebaseAuthInvalidUserException ||
+                e is FirebaseAuthInvalidCredentialsException -> AuthError.InvalidCredentials
+            e is FirebaseNetworkException -> AuthError.Network
+            code == "ERROR_OPERATION_NOT_ALLOWED" || code == "CONFIGURATION_NOT_FOUND" -> AuthError.NotEnabled
             else -> AuthError.Unknown
         }
-    )
+        // للأخطاء غير المتوقعة نُرفق رمزاً تقنياً يساعد على التشخيص (بلا بريد أو كلمة سر)
+        val detail = if (error == AuthError.Unknown || error == AuthError.NotEnabled) {
+            code ?: "${e.javaClass.simpleName}: ${e.message.orEmpty().take(160)}"
+        } else null
+        return AuthException(error, detail)
+    }
 }

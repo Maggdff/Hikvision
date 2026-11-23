@@ -56,6 +56,7 @@ import com.voiceup.app.domain.model.SeatInfo
 import com.voiceup.app.domain.voice.VoiceState
 import com.voiceup.app.presentation.errorMessageRes
 import com.voiceup.app.presentation.theme.VoiceUpColors
+import com.voiceup.app.presentation.theme.appBackground
 
 private fun rank(r: RoomRole) = when (r) {
     RoomRole.Owner -> 3
@@ -91,7 +92,7 @@ fun RoomScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .background(VoiceUpColors.BackgroundGradient)
+            .background(appBackground())
             .safeDrawingPadding()
     ) {
         val end = state.end
@@ -193,7 +194,7 @@ private fun RoomContent(
                         VoiceState.Failed -> R.string.voice_failed
                     }
                 ),
-                color = if (state.voice == VoiceState.Connected) VoiceUpColors.Blue else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (state.voice == VoiceState.Connected) VoiceUpColors.Mint else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (state.voice == VoiceState.Disconnected || state.voice == VoiceState.Failed) {
                 TextButton(onClick = onReconnect) { Text(stringResource(R.string.room_reconnect)) }
@@ -346,7 +347,7 @@ private fun SeatCell(name: String?, role: RoomRole?, speaking: Boolean, onClick:
                 .background(if (name == null) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant)
                 .border(
                     width = if (speaking) 3.dp else 1.dp,
-                    color = if (speaking) VoiceUpColors.Violet else MaterialTheme.colorScheme.surfaceVariant,
+                    color = if (speaking) VoiceUpColors.Mint else MaterialTheme.colorScheme.surfaceVariant,
                     shape = CircleShape,
                 ),
             contentAlignment = Alignment.Center,
@@ -366,7 +367,7 @@ private fun SeatCell(name: String?, role: RoomRole?, speaking: Boolean, onClick:
             Text(
                 stringResource(if (role == RoomRole.Owner) R.string.role_owner else R.string.role_moderator),
                 style = MaterialTheme.typography.labelSmall,
-                color = VoiceUpColors.Pink,
+                color = VoiceUpColors.Coral,
             )
         }
     }
@@ -409,7 +410,7 @@ private fun ChatPanel(
                 Text(
                     text = "$name: ${m.body}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (m.uid == myUid) VoiceUpColors.Blue else MaterialTheme.colorScheme.onSurface,
+                    color = if (m.uid == myUid) VoiceUpColors.Mint else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(vertical = 2.dp),
                 )
             }

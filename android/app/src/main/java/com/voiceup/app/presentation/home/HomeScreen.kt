@@ -48,7 +48,7 @@ import com.voiceup.app.domain.model.Countries
 import com.voiceup.app.domain.model.VoiceRoom
 import com.voiceup.app.presentation.countryName
 import com.voiceup.app.presentation.errorMessageRes
-import com.voiceup.app.presentation.theme.VoiceUpColors
+import com.voiceup.app.presentation.theme.appBackground
 
 @Composable
 fun HomeScreen(
@@ -68,7 +68,7 @@ fun HomeScreen(
     // الغرفة الخاصة التي ينتظر دخولها كلمة سر (معرّفها فقط، لا كلمة السر)
     var passwordFor by rememberSaveable { mutableStateOf<String?>(null) }
 
-    Box(Modifier.fillMaxSize().background(VoiceUpColors.BackgroundGradient)) {
+    Box(Modifier.fillMaxSize().background(appBackground())) {
         Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
             Text(
                 text = stringResource(R.string.home_title),
@@ -289,11 +289,11 @@ private fun Message(title: String, body: String?, action: String? = null, onActi
 
 /** ألوان بطاقة الغرفة مشتقة من معرّفها، فتبقى ثابتة لنفس الغرفة. */
 private val cardPalettes = listOf(
-    Color(0xFF6D28D9) to Color(0xFF2563EB),
-    Color(0xFFBE185D) to Color(0xFF7C3AED),
-    Color(0xFF0F766E) to Color(0xFF2563EB),
-    Color(0xFFB45309) to Color(0xFFBE185D),
-    Color(0xFF4338CA) to Color(0xFF0E7490),
+    Color(0xFF0FB58A) to Color(0xFF0E7490),
+    Color(0xFFFF7A45) to Color(0xFFE5484D),
+    Color(0xFF3B82F6) to Color(0xFF06B6D4),
+    Color(0xFF8B5CF6) to Color(0xFF3B82F6),
+    Color(0xFFF59E0B) to Color(0xFFFF7A45),
 )
 
 @Composable
