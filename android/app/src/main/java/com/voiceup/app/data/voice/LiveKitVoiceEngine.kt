@@ -5,6 +5,7 @@ import com.voiceup.app.domain.voice.VoiceEngine
 import com.voiceup.app.domain.voice.VoiceState
 import io.livekit.android.LiveKit
 import io.livekit.android.events.RoomEvent
+import io.livekit.android.events.collect
 import io.livekit.android.room.Room
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
