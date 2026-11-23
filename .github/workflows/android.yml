@@ -10,8 +10,6 @@ on:
 
 jobs:
   build:
-    # يعمل فقط بعد إنشاء مشروع Gradle في المرحلة 0 (android/gradlew)
-    if: hashFiles('android/gradlew') != ''
     runs-on: ubuntu-latest
     env:
       VOICEUP_API_URL: ${{ vars.VOICEUP_API_URL }}
