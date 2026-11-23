@@ -11,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -81,7 +81,7 @@ class RoomViewModelTest {
         assertTrue(v.state.value.names.isEmpty())
     }
 
-    @Test fun gainingASeatReconnectsWithAFreshToken() = runTest {
+    @Test fun gainingASeatReconnectsWithAFreshToken() = runBlocking {
         val v = vm()
         assertEquals(1, voice.connects.size)
 
@@ -94,14 +94,14 @@ class RoomViewModelTest {
         assertEquals(2, v.state.value.room?.mySeat)
     }
 
-    @Test fun stableSeatDoesNotReconnectOnEveryPoll() = runTest {
+    @Test fun stableSeatDoesNotReconnectOnEveryPoll() = runBlocking {
         repo.state = roomState(mySeat = 1)
         val v = vm()
         repeat(3) { v.refreshOnce() }
         assertEquals(1, voice.connects.size)
     }
 
-    @Test fun losingTheSeatTurnsTheMicOff() = runTest {
+    @Test fun losingTheSeatTurnsTheMicOff() = runBlocking {
         repo.state = roomState(mySeat = 1)
         val v = vm()
         v.setMic(true)
@@ -144,7 +144,7 @@ class RoomViewModelTest {
         )
     }
 
-    @Test fun roomClosedByOwnerDuringPollEndsAndDisconnects() = runTest {
+    @Test fun roomClosedByOwnerDuringPollEndsAndDisconnects() = runBlocking {
         val v = vm()
         repo.stateError = ApiException(404, "room_not_found")
         v.refreshOnce()
@@ -152,14 +152,14 @@ class RoomViewModelTest {
         assertTrue(voice.disconnects >= 1)
     }
 
-    @Test fun beingBannedDuringPollEndsSession() = runTest {
+    @Test fun beingBannedDuringPollEndsSession() = runBlocking {
         val v = vm()
         repo.stateError = ApiException(403, "banned_from_room")
         v.refreshOnce()
         assertEquals(RoomEnd.Banned, v.state.value.end)
     }
 
-    @Test fun transientNetworkErrorDuringPollIsIgnored() = runTest {
+    @Test fun transientNetworkErrorDuringPollIsIgnored() = runBlocking {
         val v = vm()
         repo.stateError = ApiException(0, "network")
         v.refreshOnce()
@@ -270,7 +270,7 @@ class RoomViewModelTest {
         assertEquals("سارة", s.names["u2"])
     }
 
-    @Test fun refreshMessagesAppendsOnlyNewOnesInOrderWithoutDuplicates() = runTest {
+    @Test fun refreshMessagesAppendsOnlyNewOnesInOrderWithoutDuplicates() = runBlocking {
         repo.messages = listOf(ChatMessage(1, "u2", "a", ""))
         val v = vm()
         repo.messages = repo.messages + ChatMessage(2, "u2", "b", "") + ChatMessage(3, "u2", "c", "")
@@ -309,7 +309,7 @@ class RoomViewModelTest {
         assertNull(v.state.value.end)
     }
 
-    @Test fun banDuringChatEndsSession() = runTest {
+    @Test fun banDuringChatEndsSession() = runBlocking {
         val v = vm()
         repo.messageError = ApiException(403, "banned_from_room")
         v.refreshMessages()
