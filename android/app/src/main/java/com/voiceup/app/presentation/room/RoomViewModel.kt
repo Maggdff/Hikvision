@@ -4,9 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.voiceup.app.domain.model.ApiException
 import com.voiceup.app.domain.model.ChatMessage
+import com.voiceup.app.domain.model.Gift
+import com.voiceup.app.domain.model.GiftEvent
 import com.voiceup.app.domain.model.JoinInfo
 import com.voiceup.app.domain.model.RoomState
 import com.voiceup.app.domain.model.SeatRequest
+import com.voiceup.app.domain.repository.EconomyRepository
 import com.voiceup.app.domain.repository.ProfileRepository
 import com.voiceup.app.domain.repository.RoomsRepository
 import com.voiceup.app.domain.voice.VoiceEngine
@@ -19,9 +22,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 /** سبب انتهاء الجلسة داخل الغرفة؛ الواجهة تعرضه ثم تعود للرئيسية. */
 enum class RoomEnd { Closed, Banned, LoadFailed, WrongPassword, TooManyAttempts }
+
+/** إشعار هدية حيّة يظهر أعلى الغرفة لثوانٍ. */
+data class GiftBanner(val messageId: Long, val senderUid: String, val event: GiftEvent)
 
 data class RoomUiState(
     val loading: Boolean = true,
@@ -30,6 +37,13 @@ data class RoomUiState(
     val requests: List<SeatRequest> = emptyList(),
     val messages: List<ChatMessage> = emptyList(),
     val sending: Boolean = false,
+    val gifts: List<Gift> = emptyList(),
+    /** null = لم يُحمَّل بعد. */
+    val balance: Long? = null,
+    val giftLoading: Boolean = false,
+    val giftSending: Boolean = false,
+    val giftError: String? = null,
+    val banner: GiftBanner? = null,
     val voice: VoiceState = VoiceState.Disconnected,
     val speaking: Set<String> = emptySet(),
     val micOn: Boolean = false,
@@ -45,10 +59,12 @@ class RoomViewModel(
     private val rooms: RoomsRepository,
     private val profiles: ProfileRepository,
     private val voice: VoiceEngine,
+    private val economy: EconomyRepository,
     private val pollMillis: Long = 4_000,
     private val chatPollMillis: Long = 2_000,
     /** كلمة سر الغرفة الخاصة (6 أرقام)، تبقى في الذاكرة فقط. */
     private val password: String? = null,
+    private val newKey: () -> String = { UUID.randomUUID().toString() },
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(RoomUiState())
@@ -58,6 +74,9 @@ class RoomViewModel(
     private var chatJob: Job? = null
     private var preJoin: JoinInfo? = null
     private var lastMessageId: Long? = null
+    private var historyLoaded = false
+    /** مفتاح عملية هدية لم تُحسم (انقطاع شبكة): يُعاد استعماله عند إعادة المحاولة فلا يُخصم مرتين. */
+    private var pendingGift: Triple<String, String, String>? = null
     private var seatKnown = false
     private var lastSeat: Int? = null
     private var left = false
@@ -204,7 +223,10 @@ class RoomViewModel(
     suspend fun refreshMessages() {
         try {
             val fresh = rooms.listMessages(roomId, lastMessageId)
-            if (fresh.isNotEmpty()) mergeMessages(fresh)
+            // أول جلب هو التاريخ السابق: لا نعرض له إشعارات هدايا
+            val announce = historyLoaded
+            historyLoaded = true
+            if (fresh.isNotEmpty()) mergeMessages(fresh, announce)
         } catch (e: ApiException) {
             endFor(e)
         } catch (e: CancellationException) {
@@ -214,8 +236,9 @@ class RoomViewModel(
         }
     }
 
-    private suspend fun mergeMessages(fresh: List<ChatMessage>) {
-        val unknown = fresh.map { it.uid }.toSet() - _state.value.names.keys
+    private suspend fun mergeMessages(fresh: List<ChatMessage>, announce: Boolean = false) {
+        val wanted = fresh.flatMap { listOfNotNull(it.uid, it.gift?.recipientUid) }.toSet()
+        val unknown = wanted - _state.value.names.keys
         val resolved = _state.value.names.toMutableMap()
         for (uid in unknown) {
             try {
@@ -227,9 +250,15 @@ class RoomViewModel(
             }
         }
         _state.update { s ->
+            val known = s.messages.map { it.id }.toSet()
             val merged = (s.messages + fresh).distinctBy { it.id }.sortedBy { it.id }.takeLast(MAX_MESSAGES)
             lastMessageId = merged.last().id
-            s.copy(messages = merged, names = s.names + resolved)
+            val newest = if (announce) fresh.lastOrNull { it.gift != null && it.id !in known } else null
+            s.copy(
+                messages = merged,
+                names = s.names + resolved,
+                banner = if (newest != null) GiftBanner(newest.id, newest.uid, newest.gift!!) else s.banner,
+            )
         }
     }
 
@@ -253,6 +282,58 @@ class RoomViewModel(
                 _state.update { it.copy(sending = false) }
             }
         }
+    }
+
+    // ---------- الهدايا ----------
+
+    /** يحمّل كتالوج الهدايا (مرة) والرصيد (كل مرة تُفتح فيها النافذة). */
+    fun loadGiftData() {
+        if (_state.value.giftLoading) return
+        _state.update { it.copy(giftLoading = true, giftError = null) }
+        viewModelScope.launch {
+            try {
+                val catalog = _state.value.gifts.ifEmpty { economy.listGifts() }
+                val balance = economy.getBalance()
+                _state.update { it.copy(gifts = catalog, balance = balance, giftLoading = false) }
+            } catch (e: ApiException) {
+                _state.update { it.copy(giftLoading = false, giftError = e.code) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(giftLoading = false, giftError = "unknown") }
+            }
+        }
+    }
+
+    fun sendGift(giftId: String, recipientUid: String) {
+        if (_state.value.giftSending) return
+        val reuse = pendingGift?.takeIf { it.first == giftId && it.second == recipientUid }
+        val key = reuse?.third ?: newKey()
+        pendingGift = Triple(giftId, recipientUid, key)
+        _state.update { it.copy(giftSending = true, giftError = null) }
+        viewModelScope.launch {
+            try {
+                val receipt = economy.sendGift(roomId, giftId, recipientUid, key)
+                pendingGift = null
+                _state.update { it.copy(balance = receipt.balance, giftSending = false) }
+                refreshMessages()
+            } catch (e: ApiException) {
+                // رفض نهائي من الخادم (4xx): لا فائدة من إعادة المفتاح. انقطاع/5xx: نُبقيه للمحاولة التالية.
+                if (e.status in 400..499) pendingGift = null
+                if (!endFor(e)) _state.update { it.copy(giftSending = false, giftError = e.code) }
+                else _state.update { it.copy(giftSending = false) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(giftSending = false, giftError = "unknown") }
+            }
+        }
+    }
+
+    fun clearGiftError() = _state.update { it.copy(giftError = null) }
+
+    fun dismissBanner(messageId: Long) = _state.update {
+        if (it.banner?.messageId == messageId) it.copy(banner = null) else it
     }
 
     // ---------- إجراءات المستخدم ----------

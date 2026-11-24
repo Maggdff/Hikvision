@@ -135,4 +135,17 @@
     <string name="create_password">Password (6 digits, optional)</string>
     <string name="auth_error_not_enabled">Email sign-in is not enabled in Firebase settings</string>
     <string name="auth_error_detail">Technical details: %1$s</string>
+    <string name="gift_title">Gifts</string>
+    <string name="gift_balance">Balance: %1$d coins</string>
+    <string name="gift_to">Send to</string>
+    <string name="gift_no_recipients">No one is on stage to gift right now</string>
+    <string name="gift_no_coins">You have no coins yet. Coin top-up is coming soon</string>
+    <string name="gift_empty">No gifts available right now</string>
+    <string name="chat_gift">%1$s gifted %2$s: %3$s</string>
+    <string name="err_insufficient_funds">Not enough coins</string>
+    <string name="err_recipient_not_on_stage">The recipient is no longer on stage</string>
+    <string name="err_gift_not_found">This gift is no longer available</string>
+    <string name="err_cannot_gift_self">You cannot gift yourself</string>
+    <string name="account_coins">Coin balance</string>
+    <string name="account_coins_unavailable">Could not load balance</string>
 </resources>

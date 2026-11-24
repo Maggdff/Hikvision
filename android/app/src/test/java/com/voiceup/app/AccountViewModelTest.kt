@@ -22,8 +22,9 @@ class AccountViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     private val profiles = FakeProfiles()
+    private val economy = FakeEconomy()
     private val me = UserProfile("u1", "sara", "سارة", "مرحبا", "SA")
-    private fun vm() = AccountViewModel(me, profiles)
+    private fun vm() = AccountViewModel(me, profiles, economy)
 
     @Test fun startEditCopiesCurrentValues() {
         val v = vm()
@@ -96,5 +97,21 @@ class AccountViewModelTest {
         v.onBio("ب".repeat(300))
         assertEquals(30, v.state.value.displayName.length)
         assertEquals(160, v.state.value.bio.length)
+    }
+
+    @Test fun balanceLoadsOnCreation() {
+        economy.balance = 750
+        assertEquals(750L, vm().state.value.balance)
+    }
+
+    @Test fun balanceFailureIsFlaggedNotFakedAsZero() {
+        economy.balanceError = com.voiceup.app.domain.model.ApiException(0, "network")
+        val v = vm()
+        assertNull(v.state.value.balance)
+        assertTrue(v.state.value.balanceFailed)
+        economy.balanceError = null
+        v.refreshBalance()
+        assertEquals(1_000L, v.state.value.balance)
+        assertFalse(v.state.value.balanceFailed)
     }
 }

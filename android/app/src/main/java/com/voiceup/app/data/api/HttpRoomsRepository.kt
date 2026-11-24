@@ -2,6 +2,7 @@ package com.voiceup.app.data.api
 
 import com.voiceup.app.domain.model.ApiException
 import com.voiceup.app.domain.model.ChatMessage
+import com.voiceup.app.domain.model.GiftEvent
 import com.voiceup.app.domain.model.JoinInfo
 import com.voiceup.app.domain.model.RoomRole
 import com.voiceup.app.domain.model.RoomState
@@ -9,21 +10,11 @@ import com.voiceup.app.domain.model.SeatInfo
 import com.voiceup.app.domain.model.SeatRequest
 import com.voiceup.app.domain.model.VoiceRoom
 import com.voiceup.app.domain.repository.RoomsRepository
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
-import java.util.concurrent.TimeUnit
 
-@Serializable private data class ErrorDto(val error: String = "unknown")
 @Serializable private data class RoomDto(
     val id: String,
     val title: String,
@@ -57,60 +48,42 @@ import java.util.concurrent.TimeUnit
     val password: String? = null,
 )
 @Serializable private data class JoinBody(val password: String? = null)
-@Serializable private data class MessageDto(val id: Long, val uid: String, val body: String, val createdAt: String = "")
+@Serializable private data class GiftMetaDto(
+    val giftId: String = "",
+    val recipientUid: String = "",
+    val priceCoins: Int = 0,
+    val nameAr: String = "",
+    val nameEn: String = "",
+)
+@Serializable private data class MessageDto(
+    val id: Long,
+    val uid: String,
+    val body: String,
+    val kind: String = "text",
+    val meta: GiftMetaDto? = null,
+    val createdAt: String = "",
+)
 @Serializable private data class MessageListDto(val messages: List<MessageDto>)
 @Serializable private data class SendMessageBody(val body: String)
 @Serializable private data class KickBody(val ban: Boolean)
 
 class HttpRoomsRepository(
-    private val baseUrl: String,
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .callTimeout(20, TimeUnit.SECONDS)
-        .build(),
+    baseUrl: String,
+    client: OkHttpClient = defaultHttpClient(),
     /** يوفّر Firebase ID Token الحالي، ويرمي استثناءً إن لم يكن هناك مستخدم. آخر وسيط ليقبل lambda لاحقة. */
-    private val tokens: suspend () -> String,
+    tokens: suspend () -> String,
 ) : RoomsRepository {
 
-    private val json = Json { ignoreUnknownKeys = true }
-    private val jsonType = "application/json; charset=utf-8".toMediaType()
+    private val api = ApiClient(baseUrl, client, tokens)
+    private val json get() = api.json
 
-    private suspend fun <T> call(
-        method: String,
-        path: String,
-        body: String? = null,
-        parse: (String) -> T,
-    ): T = withContext(Dispatchers.IO) {
-        if (baseUrl.isBlank()) throw ApiException(0, "not_configured")
-        val token = try {
-            tokens()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            throw ApiException(401, "unauthenticated")
-        }
-        // GET بلا جسم، وغيره بجسم JSON (OkHttp يرفض POST/PUT بلا جسم)
-        val requestBody = if (method == "GET") null else (body ?: "{}").toRequestBody(jsonType)
-        val request = Request.Builder()
-            .url(baseUrl.trimEnd('/') + "/v1" + path)
-            .header("Authorization", "Bearer $token")
-            .method(method, requestBody)
-            .build()
-        try {
-            client.newCall(request).execute().use { resp ->
-                val text = resp.body?.string().orEmpty()
-                if (!resp.isSuccessful) {
-                    val code = runCatching { json.decodeFromString<ErrorDto>(text).error }.getOrDefault("unknown")
-                    throw ApiException(resp.code, code)
-                }
-                parse(text)
-            }
-        } catch (e: IOException) {
-            throw ApiException(0, "network")
-        } catch (e: kotlinx.serialization.SerializationException) {
-            throw ApiException(0, "bad_response")
-        }
-    }
+    private suspend fun <T> call(method: String, path: String, body: String? = null, parse: (String) -> T): T =
+        api.call(method, path, body, emptyMap(), parse)
+
+    private fun MessageDto.toDomain() = ChatMessage(
+        id, uid, body, createdAt,
+        gift = if (kind == "gift" && meta != null) GiftEvent(meta.giftId, meta.recipientUid, meta.priceCoins, meta.nameAr, meta.nameEn) else null,
+    )
 
     private fun RoomDto.toDomain() = VoiceRoom(id, title, topic, ownerUid, seatedCount, maxSeats, country, isPrivate, createdAt)
 
@@ -154,12 +127,12 @@ class HttpRoomsRepository(
 
     override suspend fun listMessages(roomId: String, afterId: Long?): List<ChatMessage> =
         call("GET", "/rooms/$roomId/messages" + (afterId?.let { "?after=$it" } ?: "")) {
-            json.decodeFromString<MessageListDto>(it).messages.map { m -> ChatMessage(m.id, m.uid, m.body, m.createdAt) }
+            json.decodeFromString<MessageListDto>(it).messages.map { m -> m.toDomain() }
         }
 
     override suspend fun sendMessage(roomId: String, body: String): ChatMessage =
         call("POST", "/rooms/$roomId/messages", json.encodeToString(SendMessageBody(body))) {
-            json.decodeFromString<MessageDto>(it).let { m -> ChatMessage(m.id, m.uid, m.body, m.createdAt) }
+            json.decodeFromString<MessageDto>(it).toDomain()
         }
 
     override suspend fun mute(roomId: String, uid: String) = call("POST", "/rooms/$roomId/members/$uid/mute") { }

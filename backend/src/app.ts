@@ -2,6 +2,7 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import type { TokenVerifier } from './auth.js';
 import { HttpError, badRequest } from './errors.js';
+import { EconomyService } from './economy/service.js';
 import { RoomService } from './rooms/service.js';
 import type { VoiceProvider } from './voice.js';
 
@@ -9,6 +10,8 @@ export interface AppDeps {
   pool: pg.Pool;
   verifier: TokenVerifier;
   voice: VoiceProvider;
+  /** معرّفات Firebase لمشرفي النظام (يمنحون عملات ترويجية). فارغة = لا مشرفين. */
+  adminUids?: string[];
 }
 
 declare module 'fastify' {
@@ -45,6 +48,9 @@ export function buildApp(deps?: AppDeps) {
 
   const rooms = new RoomService(deps.pool, deps.voice, (e) => app.log.error({ err: e }, 'voice sync failed'));
 
+  const economy = new EconomyService(deps.pool);
+  const admins = new Set(deps.adminUids ?? []);
+
   // كل مسارات /v1 تتطلب Firebase ID Token صالحاً
   app.register(async (api) => {
     api.decorateRequest('uid', '');
@@ -72,6 +78,29 @@ export function buildApp(deps?: AppDeps) {
         (b.password as string | null | undefined) ?? null,
       );
       return reply.status(201).send(room);
+    });
+
+    api.get('/wallet', async (req) => ({ balance: await economy.getBalance(req.uid) }));
+
+    api.get('/gifts', async () => ({ gifts: await economy.listGifts() }));
+
+    api.post<{ Params: { id: string } }>('/rooms/:id/gifts', async (req) => {
+      const b = (req.body ?? {}) as { giftId?: unknown; recipientUid?: unknown };
+      const key = req.headers['idempotency-key'];
+      if (typeof b.giftId !== 'string' || typeof b.recipientUid !== 'string' || typeof key !== 'string') {
+        throw badRequest('invalid_request');
+      }
+      return economy.sendGift(req.uid, uuidParam(req.params.id), b.giftId, uidParam(b.recipientUid), key);
+    });
+
+    api.post('/admin/grants', async (req) => {
+      if (!admins.has(req.uid)) throw new HttpError(403, 'admin_only');
+      const b = (req.body ?? {}) as { uid?: unknown; amount?: unknown; reason?: unknown };
+      const key = req.headers['idempotency-key'];
+      if (typeof b.uid !== 'string' || typeof b.amount !== 'number' || typeof b.reason !== 'string' || typeof key !== 'string') {
+        throw badRequest('invalid_request');
+      }
+      return economy.grant(req.uid, uidParam(b.uid), b.amount, b.reason, key);
     });
 
     api.get<{ Querystring: { country?: string } }>('/rooms', async (req) => ({

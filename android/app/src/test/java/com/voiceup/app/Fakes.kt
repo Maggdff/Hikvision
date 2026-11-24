@@ -2,6 +2,10 @@ package com.voiceup.app
 
 import com.voiceup.app.domain.model.ApiException
 import com.voiceup.app.domain.model.ChatMessage
+import com.voiceup.app.domain.model.Gift
+import com.voiceup.app.domain.model.GiftReceipt
+import com.voiceup.app.domain.model.GiftTier
+import com.voiceup.app.domain.repository.EconomyRepository
 import com.voiceup.app.domain.model.JoinInfo
 import com.voiceup.app.domain.model.ProfileDraft
 import com.voiceup.app.domain.model.RoomRole
@@ -139,5 +143,44 @@ class FakeProfiles(private val names: Map<String, String> = emptyMap()) : Profil
     override suspend fun updateProfile(uid: String, displayName: String, bio: String, country: String?) {
         if (failUpdate) error("offline")
         updates += "$uid:$displayName:$bio:$country"
+    }
+}
+
+class FakeEconomy : EconomyRepository {
+    var balance = 1_000L
+    var gifts = listOf(
+        Gift("rose", "وردة", "Rose", 10, GiftTier.Small),
+        Gift("crown", "تاج", "Crown", 500, GiftTier.Medium),
+    )
+    var balanceError: ApiException? = null
+    var listError: ApiException? = null
+    /** يُرمى مرة واحدة في أول sendGift ثم يُمسح. */
+    var sendError: Exception? = null
+    val sentKeys = mutableListOf<String>()
+    val sent = mutableListOf<Pair<String, String>>()
+    private val seenKeys = mutableSetOf<String>()
+    var sendCalls = 0
+
+    override suspend fun getBalance(): Long {
+        balanceError?.let { throw it }
+        return balance
+    }
+
+    override suspend fun listGifts(): List<Gift> {
+        listError?.let { throw it }
+        return gifts
+    }
+
+    override suspend fun sendGift(roomId: String, giftId: String, recipientUid: String, idempotencyKey: String): GiftReceipt {
+        sendCalls++
+        sentKeys += idempotencyKey
+        sendError?.let { sendError = null; throw it }
+        // محاكاة الخادم: نفس المفتاح لا يخصم مرتين
+        if (!seenKeys.add(idempotencyKey)) return GiftReceipt(balance, replayed = true)
+        val g = gifts.first { it.id == giftId }
+        if (balance < g.priceCoins) throw ApiException(402, "insufficient_funds")
+        balance -= g.priceCoins
+        sent += giftId to recipientUid
+        return GiftReceipt(balance, replayed = false)
     }
 }

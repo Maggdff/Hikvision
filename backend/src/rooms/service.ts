@@ -23,6 +23,8 @@ export interface ChatMessage {
   id: number;
   uid: string;
   body: string;
+  kind: 'text' | 'gift';
+  meta: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -275,7 +277,7 @@ export class RoomService {
     if (!(await this.hasAccess(this.pool, roomId, uid))) throw forbidden('join_required');
     const recent = await this.pool.query(
       `SELECT count(*)::int AS n FROM room_messages
-        WHERE room_id = $1 AND uid = $2 AND created_at > now() - interval '10 seconds'`,
+        WHERE room_id = $1 AND uid = $2 AND kind = 'text' AND created_at > now() - interval '10 seconds'`,
       [roomId, uid],
     );
     if (recent.rows[0].n >= 5) throw tooManyRequests('rate_limited');
@@ -283,7 +285,7 @@ export class RoomService {
       'INSERT INTO room_messages(room_id, uid, body) VALUES ($1,$2,$3) RETURNING id, created_at',
       [roomId, uid, text],
     );
-    return { id: Number(r.rows[0].id), uid, body: text, createdAt: (r.rows[0].created_at as Date).toISOString() };
+    return { id: Number(r.rows[0].id), uid, body: text, kind: 'text', meta: {}, createdAt: (r.rows[0].created_at as Date).toISOString() };
   }
 
   /** after=null: آخر 50 رسالة. after=n: ما بعد المعرّف n بترتيب تصاعدي (حتى 100). */
@@ -293,17 +295,18 @@ export class RoomService {
     if (!(await this.hasAccess(this.pool, roomId, uid))) throw forbidden('join_required');
     const r = after === null
       ? await this.pool.query(
-          `SELECT id, uid, body, created_at FROM (
-             SELECT id, uid, body, created_at FROM room_messages WHERE room_id = $1 ORDER BY id DESC LIMIT 50
+          `SELECT id, uid, body, kind, meta, created_at FROM (
+             SELECT id, uid, body, kind, meta, created_at FROM room_messages WHERE room_id = $1 ORDER BY id DESC LIMIT 50
            ) t ORDER BY id`,
           [roomId],
         )
       : await this.pool.query(
-          `SELECT id, uid, body, created_at FROM room_messages WHERE room_id = $1 AND id > $2 ORDER BY id LIMIT 100`,
+          `SELECT id, uid, body, kind, meta, created_at FROM room_messages WHERE room_id = $1 AND id > $2 ORDER BY id LIMIT 100`,
           [roomId, after],
         );
     return r.rows.map((x) => ({
-      id: Number(x.id), uid: x.uid as string, body: x.body as string, createdAt: (x.created_at as Date).toISOString(),
+      id: Number(x.id), uid: x.uid as string, body: x.body as string,
+      kind: x.kind as 'text' | 'gift', meta: x.meta as Record<string, unknown>, createdAt: (x.created_at as Date).toISOString(),
     }));
   }
 

@@ -1,12 +1,12 @@
 package com.voiceup.app.presentation.main
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -17,8 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.voiceup.app.R
 
 enum class MainTab { Home, Account }
@@ -35,8 +35,8 @@ fun MainScaffold(
     Scaffold(
         bottomBar = {
             NavigationBar {
-                tabItem(MainTab.Home, tab, R.string.nav_home) { tab = it }
-                tabItem(MainTab.Account, tab, R.string.nav_account) { tab = it }
+                tabItem(MainTab.Home, tab, R.string.nav_home, Icons.Rounded.Home) { tab = it }
+                tabItem(MainTab.Account, tab, R.string.nav_account, Icons.Rounded.Person) { tab = it }
             }
         },
     ) { padding ->
@@ -54,20 +54,14 @@ private fun androidx.compose.foundation.layout.RowScope.tabItem(
     me: MainTab,
     current: MainTab,
     label: Int,
+    icon: ImageVector,
     onSelect: (MainTab) -> Unit,
 ) {
     val selected = me == current
     NavigationBarItem(
         selected = selected,
         onClick = { onSelect(me) },
-        icon = {
-            Box(
-                Modifier.size(10.dp).background(
-                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    CircleShape,
-                ),
-            )
-        },
+        icon = { Icon(icon, contentDescription = null) },
         label = { Text(stringResource(label)) },
         alwaysShowLabel = true,
     )

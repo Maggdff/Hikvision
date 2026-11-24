@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "migrate": "tsx src/db/migrate.ts",
     "migrate:prod": "node dist/db/migrate.js",
+    "grant": "tsx src/scripts/grant-coins.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

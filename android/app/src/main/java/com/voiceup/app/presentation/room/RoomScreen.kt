@@ -25,7 +25,11 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CardGiftcard
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -54,7 +58,9 @@ import com.voiceup.app.domain.model.ChatMessage
 import com.voiceup.app.domain.model.RoomRole
 import com.voiceup.app.domain.model.SeatInfo
 import com.voiceup.app.domain.voice.VoiceState
+import com.voiceup.app.presentation.components.Avatar
 import com.voiceup.app.presentation.errorMessageRes
+import com.voiceup.app.presentation.giftName
 import com.voiceup.app.presentation.theme.VoiceUpColors
 import com.voiceup.app.presentation.theme.appBackground
 
@@ -82,6 +88,9 @@ fun RoomScreen(
     onReconnect: () -> Unit,
     onClearError: () -> Unit,
     onSendMessage: (text: String, onSent: () -> Unit) -> Unit,
+    onLoadGifts: () -> Unit,
+    onSendGift: (giftId: String, recipientUid: String) -> Unit,
+    onDismissBanner: (messageId: Long) -> Unit,
     onExit: () -> Unit,
 ) {
     BackHandler(enabled = state.end == null) {
@@ -103,8 +112,11 @@ fun RoomScreen(
             else -> RoomContent(
                 myUid, state, room.title, room.topic, room.maxSeats, room.myRole, room.mySeat, room.seats,
                 onSetMic, onRequestSeat, onLeaveSeat, onLeaveRoom, onClose, onDecide, onMute, onKick,
-                onReconnect, onClearError, onSendMessage, onExit,
+                onReconnect, onClearError, onSendMessage, onLoadGifts, onSendGift, onExit,
             )
+        }
+        state.banner?.let { b ->
+            GiftBannerView(b, myUid, state.names, onDismissBanner, Modifier.align(Alignment.TopCenter))
         }
     }
 }
@@ -154,8 +166,11 @@ private fun RoomContent(
     onReconnect: () -> Unit,
     onClearError: () -> Unit,
     onSendMessage: (String, () -> Unit) -> Unit,
+    onLoadGifts: () -> Unit,
+    onSendGift: (String, String) -> Unit,
     onExit: () -> Unit,
 ) {
+    var showGifts by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     var permissionDenied by remember { mutableStateOf(false) }
     var confirmClose by remember { mutableStateOf(false) }
@@ -228,6 +243,7 @@ private fun RoomContent(
                 val moderatable = seat != null && seat.uid != myUid && canModerate(myRole, seat.role)
                 SeatCell(
                     name = name,
+                    seedUid = seat?.uid,
                     role = seat?.role,
                     speaking = seat != null && seat.uid in state.speaking,
                     onClick = if (moderatable) ({ target = seat }) else null,
@@ -287,6 +303,9 @@ private fun RoomContent(
                     Text(stringResource(if (state.requestPending) R.string.room_request_sent else R.string.room_request_seat))
                 }
             }
+            IconButton(onClick = { showGifts = true }) {
+                Icon(Icons.Rounded.CardGiftcard, contentDescription = stringResource(R.string.gift_title), tint = VoiceUpColors.Coral)
+            }
             OutlinedButton(onClick = { onLeaveRoom(); onExit() }) { Text(stringResource(R.string.room_leave)) }
             if (myRole == RoomRole.Owner) {
                 OutlinedButton(onClick = { confirmClose = true }, enabled = !state.busy) {
@@ -294,6 +313,17 @@ private fun RoomContent(
                 }
             }
         }
+    }
+
+    if (showGifts) {
+        GiftSheet(
+            state = state,
+            myUid = myUid,
+            seats = seats,
+            onLoad = onLoadGifts,
+            onSend = onSendGift,
+            onDismiss = { showGifts = false },
+        )
     }
 
     // إجراءات الإشراف على عضو
@@ -333,7 +363,7 @@ private fun RoomContent(
 }
 
 @Composable
-private fun SeatCell(name: String?, role: RoomRole?, speaking: Boolean, onClick: (() -> Unit)?) {
+private fun SeatCell(name: String?, seedUid: String?, role: RoomRole?, speaking: Boolean, onClick: (() -> Unit)?) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -353,7 +383,7 @@ private fun SeatCell(name: String?, role: RoomRole?, speaking: Boolean, onClick:
             contentAlignment = Alignment.Center,
         ) {
             if (name != null) {
-                Text(name.take(1).uppercase(), style = MaterialTheme.typography.titleLarge)
+                Avatar(name = name, seed = seedUid ?: name, size = 64.dp)
             }
         }
         Text(
@@ -407,12 +437,23 @@ private fun ChatPanel(
             }
             items(messages, key = { it.id }) { m ->
                 val name = if (m.uid == myUid) stringResource(R.string.chat_me) else (names[m.uid] ?: m.uid.take(6))
-                Text(
-                    text = "$name: ${m.body}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (m.uid == myUid) VoiceUpColors.Mint else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(vertical = 2.dp),
-                )
+                val gift = m.gift
+                if (gift != null) {
+                    val to = if (gift.recipientUid == myUid) stringResource(R.string.chat_me) else (names[gift.recipientUid] ?: gift.recipientUid.take(6))
+                    Text(
+                        text = stringResource(R.string.chat_gift, name, to, giftName(gift.nameAr, gift.nameEn)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = VoiceUpColors.Orange,
+                        modifier = Modifier.padding(vertical = 2.dp),
+                    )
+                } else {
+                    Text(
+                        text = "$name: ${m.body}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (m.uid == myUid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(vertical = 2.dp),
+                    )
+                }
             }
         }
         Row(
@@ -431,6 +472,49 @@ private fun ChatPanel(
                 onClick = { onSend(draft) { draft = "" } },
                 enabled = draft.isNotBlank() && !sending,
             ) { Text(stringResource(R.string.chat_send)) }
+        }
+    }
+}
+
+/** إشعار هدية حيّ أعلى الغرفة؛ يختفي تلقائياً بعد ثوانٍ. */
+@Composable
+private fun GiftBannerView(
+    banner: GiftBanner,
+    myUid: String,
+    names: Map<String, String>,
+    onDismiss: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LaunchedEffect(banner.messageId) {
+        kotlinx.coroutines.delay(3_500)
+        onDismiss(banner.messageId)
+    }
+    val from = if (banner.senderUid == myUid) stringResource(R.string.chat_me) else (names[banner.senderUid] ?: banner.senderUid.take(6))
+    val to = if (banner.event.recipientUid == myUid) stringResource(R.string.chat_me) else (names[banner.event.recipientUid] ?: banner.event.recipientUid.take(6))
+    androidx.compose.animation.AnimatedVisibility(
+        visible = true,
+        enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) + androidx.compose.animation.fadeIn(),
+        modifier = modifier,
+    ) {
+        Row(
+            Modifier
+                .safeDrawingPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .fillMaxWidth()
+                .background(
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(VoiceUpColors.Orange, VoiceUpColors.Coral)),
+                    androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                )
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(Icons.Rounded.CardGiftcard, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White)
+            Text(
+                stringResource(R.string.chat_gift, from, to, giftName(banner.event.nameAr, banner.event.nameEn)),
+                color = androidx.compose.ui.graphics.Color.White,
+                style = MaterialTheme.typography.titleSmall,
+            )
         }
     }
 }

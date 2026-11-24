@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.voiceup.app.R
 import com.voiceup.app.domain.model.Countries
+import com.voiceup.app.presentation.components.Avatar
 import com.voiceup.app.presentation.countryName
 import com.voiceup.app.presentation.home.CountryPickerDialog
 import com.voiceup.app.presentation.theme.VoiceUpColors
@@ -60,20 +62,29 @@ fun AccountScreen(
         Text(stringResource(R.string.nav_account), style = MaterialTheme.typography.headlineMedium)
 
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            // صورة رمزية مؤقتة بالحرف الأول؛ رفع الصور يأتي مع Firebase Storage لاحقاً.
-            Box(
-                Modifier.size(64.dp).background(VoiceUpColors.AccentGradient, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    p.displayName.take(1).uppercase(),
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-            }
+            Avatar(name = p.displayName, seed = p.uid, size = 64.dp)
             Column {
                 Text(p.displayName, style = MaterialTheme.typography.titleLarge)
                 Text("@${p.username}", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+
+        // رصيد العملات (للقراءة فقط؛ الشحن عبر Google Play يُضاف لاحقاً)
+        Row(
+            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp)).padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.account_coins), style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = when {
+                    state.balance != null -> "${state.balance}"
+                    state.balanceFailed -> stringResource(R.string.account_coins_unavailable)
+                    else -> "…"
+                },
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
 
         if (!state.editing) {

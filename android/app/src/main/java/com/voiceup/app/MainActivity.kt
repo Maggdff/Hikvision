@@ -18,6 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.voiceup.app.data.FirebaseAuthRepository
 import com.voiceup.app.data.FirestoreProfileRepository
 import com.voiceup.app.data.api.FirebaseIdTokenProvider
+import com.voiceup.app.data.api.HttpEconomyRepository
 import com.voiceup.app.data.api.HttpRoomsRepository
 import com.voiceup.app.data.voice.LiveKitVoiceEngine
 import com.voiceup.app.domain.model.UserProfile
@@ -48,10 +49,9 @@ class MainActivity : ComponentActivity() {
 
     private val authRepo by lazy { FirebaseAuthRepository() }
     private val profileRepo by lazy { FirestoreProfileRepository() }
-    private val roomsRepo by lazy {
-        val tokens = FirebaseIdTokenProvider()
-        HttpRoomsRepository(BuildConfig.API_BASE_URL) { tokens.token() }
-    }
+    private val tokenProvider by lazy { FirebaseIdTokenProvider() }
+    private val roomsRepo by lazy { HttpRoomsRepository(BuildConfig.API_BASE_URL) { tokenProvider.token() } }
+    private val economyRepo by lazy { HttpEconomyRepository(BuildConfig.API_BASE_URL) { tokenProvider.token() } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
         if (current == null) {
             val accountVm: AccountViewModel = viewModel(
                 key = "account-$uid",
-                factory = factory { AccountViewModel(profile, profileRepo) },
+                factory = factory { AccountViewModel(profile, profileRepo, economyRepo) },
             )
             MainScaffold(
                 home = {
@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
                 key = "room-$current-$entry",
                 factory = factory {
                     RoomViewModel(
-                        current, roomsRepo, profileRepo, LiveKitVoiceEngine(applicationContext),
+                        current, roomsRepo, profileRepo, LiveKitVoiceEngine(applicationContext), economyRepo,
                         password = roomPassword,
                     )
                 },
@@ -166,6 +166,9 @@ class MainActivity : ComponentActivity() {
                     onReconnect = vm::reconnect,
                     onClearError = vm::clearError,
                     onSendMessage = vm::sendMessage,
+                    onLoadGifts = vm::loadGiftData,
+                    onSendGift = vm::sendGift,
+                    onDismissBanner = vm::dismissBanner,
                     onExit = {
                         roomId = null
                         roomPassword = null

@@ -29,10 +29,11 @@ class RoomViewModelTest {
 
     private val repo = FakeRoomsRepository()
     private val voice = FakeVoiceEngine()
+    private val economy = FakeEconomy()
     private val profiles = FakeProfiles(mapOf("owner-uid" to "المالك", "u2" to "سارة"))
 
     // الاستطلاع الدوري بعيد جداً كي لا يتدخل؛ نستدعي refreshOnce() يدوياً
-    private fun vm() = RoomViewModel("room-1", repo, profiles, voice, pollMillis = 1_000_000)
+    private fun vm() = RoomViewModel("room-1", repo, profiles, voice, economy, pollMillis = 1_000_000)
 
     @Test fun enteringLoadsRoomAndConnectsVoiceWithServerToken() {
         val v = vm()
@@ -69,7 +70,7 @@ class RoomViewModelTest {
             state = roomState(myRole = RoomRole.Moderator, mySeat = 1)
             requests = listOf(SeatRequest("r1", "u2"))
         }
-        val v = RoomViewModel("room-1", staffRepo, profiles, FakeVoiceEngine(), 1_000_000)
+        val v = RoomViewModel("room-1", staffRepo, profiles, FakeVoiceEngine(), FakeEconomy(), 1_000_000)
         assertEquals(listOf(SeatRequest("r1", "u2")), v.state.value.requests)
         assertEquals("سارة", v.state.value.names["u2"])
     }
@@ -194,7 +195,7 @@ class RoomViewModelTest {
         assertTrue(voice.disconnects >= 1)
 
         val ownerRepo = FakeRoomsRepository().apply { state = roomState(myRole = RoomRole.Owner, mySeat = 0) }
-        RoomViewModel("room-1", ownerRepo, profiles, FakeVoiceEngine(), 1_000_000).leaveRoom()
+        RoomViewModel("room-1", ownerRepo, profiles, FakeVoiceEngine(), FakeEconomy(), 1_000_000).leaveRoom()
         assertFalse(ownerRepo.calls.contains("leaveSeat"))
     }
 
@@ -233,7 +234,7 @@ class RoomViewModelTest {
     // ---------- الغرف الخاصة ----------
 
     private fun privateVm(pw: String? = "123456") =
-        RoomViewModel("room-1", repo, profiles, voice, pollMillis = 1_000_000, password = pw)
+        RoomViewModel("room-1", repo, profiles, voice, economy, pollMillis = 1_000_000, password = pw)
 
     @Test fun privateRoomJoinsWithPasswordBeforeLoadingState() {
         val v = privateVm()
@@ -314,5 +315,103 @@ class RoomViewModelTest {
         repo.messageError = ApiException(403, "banned_from_room")
         v.refreshMessages()
         assertEquals(RoomEnd.Banned, v.state.value.end)
+    }
+
+    // ---------- الهدايا ----------
+
+    private fun giftVm(keys: List<String> = listOf("key-1", "key-2", "key-3")): RoomViewModel {
+        val iter = keys.iterator()
+        return RoomViewModel("room-1", repo, profiles, voice, economy, pollMillis = 1_000_000, newKey = { iter.next() })
+    }
+
+    @Test fun loadGiftDataFetchesCatalogAndBalance() {
+        val v = giftVm()
+        v.loadGiftData()
+        val s = v.state.value
+        assertEquals(listOf("rose", "crown"), s.gifts.map { it.id })
+        assertEquals(1_000L, s.balance)
+        assertFalse(s.giftLoading)
+        assertNull(s.giftError)
+    }
+
+    @Test fun loadGiftDataFailureShowsErrorAndAllowsRetry() {
+        economy.balanceError = ApiException(0, "network")
+        val v = giftVm()
+        v.loadGiftData()
+        assertEquals("network", v.state.value.giftError)
+        assertFalse(v.state.value.giftLoading)
+        economy.balanceError = null
+        v.loadGiftData()
+        assertNull(v.state.value.giftError)
+        assertEquals(1_000L, v.state.value.balance)
+    }
+
+    @Test fun sendGiftUpdatesBalanceAndClearsPendingKey() {
+        val v = giftVm()
+        v.loadGiftData()
+        v.sendGift("crown", "u2")
+        assertEquals(500L, v.state.value.balance)
+        assertEquals(listOf("crown" to "u2"), economy.sent)
+        assertFalse(v.state.value.giftSending)
+        // عملية جديدة بعد النجاح تأخذ مفتاحاً جديداً
+        v.sendGift("crown", "u2")
+        assertEquals(listOf("key-1", "key-2"), economy.sentKeys)
+    }
+
+    @Test fun networkFailureKeepsKeySoRetryCannotDoubleCharge() {
+        val v = giftVm()
+        v.loadGiftData()
+        economy.sendError = ApiException(0, "network")
+        v.sendGift("crown", "u2")
+        assertEquals("network", v.state.value.giftError)
+        v.sendGift("crown", "u2")
+        assertEquals(listOf("key-1", "key-1"), economy.sentKeys)
+        assertEquals(500L, v.state.value.balance)
+    }
+
+    @Test fun definitiveRejectionDropsKeyAndShowsServerCode() {
+        economy.balance = 5
+        val v = giftVm()
+        v.loadGiftData()
+        v.sendGift("rose", "u2")
+        assertEquals("insufficient_funds", v.state.value.giftError)
+        assertEquals(5L, v.state.value.balance)
+        economy.balance = 100
+        v.sendGift("rose", "u2")
+        assertEquals(listOf("key-1", "key-2"), economy.sentKeys)
+        assertNull(v.state.value.giftError)
+    }
+
+    @Test fun differentGiftOrRecipientNeverReusesAPendingKey() {
+        val v = giftVm()
+        v.loadGiftData()
+        economy.sendError = ApiException(0, "network")
+        v.sendGift("rose", "u2")
+        v.sendGift("crown", "u2")
+        assertEquals(listOf("key-1", "key-2"), economy.sentKeys)
+    }
+
+    @Test fun historyGiftsDoNotTriggerABannerButLiveOnesDo() = runBlocking {
+        val old = ChatMessage(1, "u2", "rose", "", com.voiceup.app.domain.model.GiftEvent("rose", "owner-uid", 10, "وردة", "Rose"))
+        repo.messages = listOf(old)
+        val v = vm()
+        assertNull(v.state.value.banner)
+        val live = ChatMessage(2, "u2", "crown", "", com.voiceup.app.domain.model.GiftEvent("crown", "owner-uid", 500, "تاج", "Crown"))
+        repo.messages = repo.messages + live
+        v.refreshMessages()
+        val b = v.state.value.banner
+        assertEquals(2L, b?.messageId)
+        assertEquals("u2", b?.senderUid)
+        v.dismissBanner(1) // معرّف آخر لا يمسحه
+        assertEquals(2L, v.state.value.banner?.messageId)
+        v.dismissBanner(2)
+        assertNull(v.state.value.banner)
+    }
+
+    @Test fun recipientNameIsResolvedForGiftMessages() = runBlocking {
+        repo.messages = listOf(ChatMessage(1, "u2", "rose", "", com.voiceup.app.domain.model.GiftEvent("rose", "owner-uid", 10, "وردة", "Rose")))
+        val v = vm()
+        assertEquals("المالك", v.state.value.names["owner-uid"])
+        assertEquals("سارة", v.state.value.names["u2"])
     }
 }

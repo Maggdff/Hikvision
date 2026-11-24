@@ -27,6 +27,10 @@ fun errorMessageRes(code: String): Int = when (code) {
     "join_required", "password_required" -> R.string.err_join_required
     "invalid_password" -> R.string.err_invalid_password
     "invalid_country" -> R.string.err_invalid_country
+    "insufficient_funds" -> R.string.err_insufficient_funds
+    "recipient_not_on_stage" -> R.string.err_recipient_not_on_stage
+    "gift_not_found" -> R.string.err_gift_not_found
+    "cannot_gift_self" -> R.string.err_cannot_gift_self
     "voice_failed" -> R.string.err_voice_failed
     "mic_failed" -> R.string.err_mic_failed
     else -> R.string.err_unknown
@@ -35,3 +39,7 @@ fun errorMessageRes(code: String): Int = when (code) {
 /** اسم الدولة حسب لغة الجهاز (عربي أو إنجليزي). */
 fun countryName(c: com.voiceup.app.domain.model.Country): String =
     if (java.util.Locale.getDefault().language == "ar") c.nameAr else c.nameEn
+
+/** اسم الهدية حسب لغة الجهاز. */
+fun giftName(nameAr: String, nameEn: String): String =
+    if (java.util.Locale.getDefault().language == "ar") nameAr else nameEn

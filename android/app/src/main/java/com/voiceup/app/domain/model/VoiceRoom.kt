@@ -40,7 +40,23 @@ data class RoomState(
     val seats: List<SeatInfo>,
 )
 
-data class ChatMessage(val id: Long, val uid: String, val body: String, val createdAt: String)
+/** تفاصيل رسالة هدية داخل مجرى الدردشة. */
+data class GiftEvent(
+    val giftId: String,
+    val recipientUid: String,
+    val priceCoins: Int,
+    val nameAr: String,
+    val nameEn: String,
+)
+
+/** kind=text: body هو النص. kind=gift: gift معبّأ وbody هو معرّف الهدية. */
+data class ChatMessage(
+    val id: Long,
+    val uid: String,
+    val body: String,
+    val createdAt: String,
+    val gift: GiftEvent? = null,
+)
 
 data class SeatRequest(val id: String, val uid: String)
 

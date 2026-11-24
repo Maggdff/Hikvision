@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.voiceup.app.domain.model.Countries
 import com.voiceup.app.domain.model.UserProfile
+import com.voiceup.app.domain.repository.EconomyRepository
 import com.voiceup.app.domain.repository.ProfileRepository
 import com.voiceup.app.domain.validation.Validators
 import kotlinx.coroutines.CancellationException
@@ -20,6 +21,9 @@ data class AccountUiState(
     val bio: String = "",
     val country: String? = null,
     val saving: Boolean = false,
+    /** رصيد العملات؛ null حتى يُحمَّل. */
+    val balance: Long? = null,
+    val balanceFailed: Boolean = false,
     /** invalid_name | invalid_bio | save_failed */
     val errorCode: String? = null,
 )
@@ -27,10 +31,26 @@ data class AccountUiState(
 class AccountViewModel(
     initial: UserProfile,
     private val profiles: ProfileRepository,
+    private val economy: EconomyRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AccountUiState(initial))
     val state: StateFlow<AccountUiState> = _state.asStateFlow()
+
+    init { refreshBalance() }
+
+    fun refreshBalance() {
+        viewModelScope.launch {
+            try {
+                val b = economy.getBalance()
+                _state.update { it.copy(balance = b, balanceFailed = false) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(balanceFailed = true) }
+            }
+        }
+    }
 
     fun startEdit() = _state.update {
         it.copy(

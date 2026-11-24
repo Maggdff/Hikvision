@@ -135,4 +135,17 @@
     <string name="create_password">كلمة سر (6 أرقام، اختياري)</string>
     <string name="auth_error_not_enabled">تسجيل الدخول بالبريد غير مفعّل في إعدادات Firebase</string>
     <string name="auth_error_detail">التفاصيل التقنية: %1$s</string>
+    <string name="gift_title">الهدايا</string>
+    <string name="gift_balance">رصيدك: %1$d عملة</string>
+    <string name="gift_to">أرسل إلى</string>
+    <string name="gift_no_recipients">لا أحد على المنصة الآن لإهدائه</string>
+    <string name="gift_no_coins">لا تملك عملات بعد. شحن العملات سيتوفر قريباً</string>
+    <string name="gift_empty">لا توجد هدايا متاحة الآن</string>
+    <string name="chat_gift">%1$s أهدى %2$s: %3$s</string>
+    <string name="err_insufficient_funds">رصيدك من العملات غير كافٍ</string>
+    <string name="err_recipient_not_on_stage">المستلم لم يعد على المنصة</string>
+    <string name="err_gift_not_found">هذه الهدية لم تعد متاحة</string>
+    <string name="err_cannot_gift_self">لا يمكنك إهداء نفسك</string>
+    <string name="account_coins">رصيد العملات</string>
+    <string name="account_coins_unavailable">تعذر تحميل الرصيد</string>
 </resources>
