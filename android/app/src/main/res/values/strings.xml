@@ -148,4 +148,6 @@
     <string name="err_cannot_gift_self">لا يمكنك إهداء نفسك</string>
     <string name="account_coins">رصيد العملات</string>
     <string name="account_coins_unavailable">تعذر تحميل الرصيد</string>
+    <string name="account_wealth_level">مستوى الثروة</string>
+    <string name="account_charm_level">مستوى الجاذبية</string>
 </resources>

@@ -77,4 +77,13 @@ class HttpEconomyRepositoryTest {
             assertEquals("insufficient_funds", e.code)
         }
     }
+
+    @Test fun levelsAreParsedFromLevelsEndpoint() = runBlocking {
+        server.enqueue(json("""{"wealth":{"points":500,"level":4,"nextAt":800},"charm":{"points":0,"level":1,"nextAt":50}}"""))
+        val l = repo.getLevels()
+        assertEquals("/v1/levels", server.takeRequest().path)
+        assertEquals(4, l.wealth.level)
+        assertEquals(800L, l.wealth.nextAt)
+        assertEquals(1, l.charm.level)
+    }
 }

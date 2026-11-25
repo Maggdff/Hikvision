@@ -154,6 +154,11 @@ class FakeEconomy : EconomyRepository {
     )
     var balanceError: ApiException? = null
     var listError: ApiException? = null
+    var levels = com.voiceup.app.domain.model.Levels(
+        com.voiceup.app.domain.model.LevelInfo(0, 1, 50),
+        com.voiceup.app.domain.model.LevelInfo(0, 1, 50),
+    )
+    var levelsError: ApiException? = null
     /** يُرمى مرة واحدة في أول sendGift ثم يُمسح. */
     var sendError: Exception? = null
     val sentKeys = mutableListOf<String>()
@@ -164,6 +169,11 @@ class FakeEconomy : EconomyRepository {
     override suspend fun getBalance(): Long {
         balanceError?.let { throw it }
         return balance
+    }
+
+    override suspend fun getLevels(): com.voiceup.app.domain.model.Levels {
+        levelsError?.let { throw it }
+        return levels
     }
 
     override suspend fun listGifts(): List<Gift> {

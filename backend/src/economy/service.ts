@@ -16,6 +16,18 @@ export interface SendGiftResult {
   replayed: boolean;
 }
 
+export interface LevelInfo {
+  points: number;
+  level: number;
+  /** نقاط المستوى التالي، أو null عند أعلى مستوى */
+  nextAt: number | null;
+}
+
+export interface Levels {
+  wealth: LevelInfo; // مجموع ما أرسله المستخدم من هدايا
+  charm: LevelInfo; // مجموع ما استلمه من هدايا
+}
+
 const MAX_GRANT = 1_000_000;
 
 /**
@@ -70,6 +82,28 @@ export class EconomyService {
   async getBalance(uid: string): Promise<number> {
     const r = await this.pool.query('SELECT id FROM ledger_accounts WHERE code = $1', [`wallet:${uid}`]);
     return r.rows[0] ? this.balanceOf(this.pool, Number(r.rows[0].id)) : 0;
+  }
+
+  /** المستويات من سجل الهدايا الفعلي والعتبات في الجدول. من لم يرسل أو يستقبل شيئاً مستواه 1 بنقاط 0. */
+  async getLevels(uid: string): Promise<Levels> {
+    const pts = await this.pool.query(
+      `SELECT COALESCE(SUM(price_coins) FILTER (WHERE sender_uid = $1), 0)    AS wealth,
+              COALESCE(SUM(price_coins) FILTER (WHERE recipient_uid = $1), 0) AS charm
+         FROM room_gifts WHERE sender_uid = $1 OR recipient_uid = $1`,
+      [uid],
+    );
+    const points = { wealth: Number(pts.rows[0].wealth), charm: Number(pts.rows[0].charm) };
+    const info = async (kind: 'wealth' | 'charm'): Promise<LevelInfo> => {
+      const r = await this.pool.query(
+        `SELECT COALESCE(MAX(level) FILTER (WHERE min_points <= $2), 1) AS level,
+                MIN(min_points) FILTER (WHERE min_points > $2)          AS next_at
+           FROM level_thresholds WHERE kind = $1`,
+        [kind, points[kind]],
+      );
+      const row = r.rows[0];
+      return { points: points[kind], level: Number(row.level), nextAt: row.next_at == null ? null : Number(row.next_at) };
+    };
+    return { wealth: await info('wealth'), charm: await info('charm') };
   }
 
   async listGifts(): Promise<Gift[]> {

@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.voiceup.app.R
+import com.voiceup.app.presentation.theme.VoiceUpTheme
 
 enum class MainTab { Home, Account }
 
@@ -32,9 +33,14 @@ fun MainScaffold(
     account: @Composable () -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(MainTab.Home) }
+    // الرئيسية داكنة، و«حسابي» كريمية فاتحة كما في التصميم
+    VoiceUpTheme(dark = tab == MainTab.Home) {
     Scaffold(
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+            ) {
                 tabItem(MainTab.Home, tab, R.string.nav_home, Icons.Rounded.Home) { tab = it }
                 tabItem(MainTab.Account, tab, R.string.nav_account, Icons.Rounded.Person) { tab = it }
             }
@@ -46,6 +52,7 @@ fun MainScaffold(
                 MainTab.Account -> account()
             }
         }
+    }
     }
 }
 
@@ -64,5 +71,12 @@ private fun androidx.compose.foundation.layout.RowScope.tabItem(
         icon = { Icon(icon, contentDescription = null) },
         label = { Text(stringResource(label)) },
         alwaysShowLabel = true,
+        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+            selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+            selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+            indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+            unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+            unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
     )
 }

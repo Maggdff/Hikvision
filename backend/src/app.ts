@@ -82,6 +82,10 @@ export function buildApp(deps?: AppDeps) {
 
     api.get('/wallet', async (req) => ({ balance: await economy.getBalance(req.uid) }));
 
+    // مستويات الثروة والجاذبية: لي، أو لأي مستخدم (معلومة عامة بين المسجّلين)
+    api.get('/levels', async (req) => economy.getLevels(req.uid));
+    api.get<{ Params: { uid: string } }>('/users/:uid/levels', async (req) => economy.getLevels(uidParam(req.params.uid)));
+
     api.get('/gifts', async () => ({ gifts: await economy.listGifts() }));
 
     api.post<{ Params: { id: string } }>('/rooms/:id/gifts', async (req) => {

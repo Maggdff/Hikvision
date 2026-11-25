@@ -218,4 +218,46 @@ d('economy: wallet, gifts, ledger (Postgres)', () => {
     for (let i = 0; i < 6; i++) expect((await send(fan, id, 'rose')).statusCode).toBe(200);
     expect((await call(fan, 'POST', `/rooms/${id}/messages`, { body: 'مرحبا' })).statusCode).toBe(201);
   });
+
+  it('levels: a user with no gifts is level 1 with 0 points', async () => {
+    const r = await call(fan, 'GET', '/levels');
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({
+      wealth: { points: 0, level: 1, nextAt: 50 },
+      charm: { points: 0, level: 1, nextAt: 50 },
+    });
+  });
+
+  it('levels: wealth grows for the sender and charm for the receiver, from real gifts only', async () => {
+    await grant(fan, 1000);
+    const id = await room();
+    await send(fan, id, 'crown'); // 500 نقطة
+    const mine = (await call(fan, 'GET', '/levels')).json();
+    expect(mine.wealth.points).toBe(500);
+    expect(mine.wealth.level).toBe(4); // عتبات البذرة: 50×(n−1)² → المستوى 4 عند 450، 5 عند 800
+    expect(mine.wealth.nextAt).toBe(800);
+    expect(mine.charm.points).toBe(0);
+
+    const owner = (await call(fan, 'GET', '/users/uid-owner/levels')).json();
+    expect(owner.charm.points).toBe(500);
+    expect(owner.charm.level).toBe(4);
+    expect(owner.wealth.points).toBe(0);
+  });
+
+  it('levels: thresholds are data — editing the table changes the level', async () => {
+    await grant(fan, 1000);
+    const id = await room();
+    await send(fan, id, 'crown');
+    await pool.query(`UPDATE level_thresholds SET min_points = 100 WHERE kind='wealth' AND level = 2`);
+    await pool.query(`UPDATE level_thresholds SET min_points = 400 WHERE kind='wealth' AND level = 3`);
+    await pool.query(`UPDATE level_thresholds SET min_points = 450 WHERE kind='wealth' AND level = 4`);
+    const w = (await call(fan, 'GET', '/levels')).json().wealth;
+    expect(w.level).toBe(4);
+    await pool.query(`UPDATE level_thresholds SET min_points = 50 * (level - 1) * (level - 1) WHERE kind='wealth'`);
+  });
+
+  it('levels: require a signed-in user and a valid uid', async () => {
+    expect((await call(null, 'GET', '/levels')).statusCode).toBe(401);
+    expect((await call(fan, 'GET', '/users/bad%20uid/levels')).statusCode).toBe(400);
+  });
 });

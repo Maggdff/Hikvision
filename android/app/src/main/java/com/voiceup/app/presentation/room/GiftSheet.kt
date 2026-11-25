@@ -17,6 +17,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CardGiftcard
+import androidx.compose.material.icons.rounded.Castle
+import androidx.compose.material.icons.rounded.Coffee
+import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.LocalFlorist
+import androidx.compose.material.icons.rounded.RocketLaunch
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -33,14 +41,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.voiceup.app.R
 import com.voiceup.app.domain.model.Gift
-import com.voiceup.app.domain.model.GiftTier
 import com.voiceup.app.domain.model.SeatInfo
 import com.voiceup.app.presentation.errorMessageRes
 import com.voiceup.app.presentation.giftName
@@ -121,15 +127,20 @@ fun GiftSheet(
     }
 }
 
-private fun tierColors(t: GiftTier): Pair<Color, Color> = when (t) {
-    GiftTier.Small -> Color(0xFF0FB58A) to Color(0xFF06B6D4)
-    GiftTier.Medium -> Color(0xFF8B5CF6) to Color(0xFF3B82F6)
-    GiftTier.Large -> Color(0xFFFF7A45) to Color(0xFFE5484D)
+private fun giftIcon(id: String): androidx.compose.ui.graphics.vector.ImageVector = when (id) {
+    "rose" -> Icons.Rounded.LocalFlorist
+    "heart" -> Icons.Rounded.Favorite
+    "coffee" -> Icons.Rounded.Coffee
+    "star" -> Icons.Rounded.Star
+    "crown" -> Icons.Rounded.WorkspacePremium
+    "rocket" -> Icons.Rounded.RocketLaunch
+    "car" -> Icons.Rounded.DirectionsCar
+    "palace" -> Icons.Rounded.Castle
+    else -> Icons.Rounded.CardGiftcard
 }
 
 @Composable
 private fun GiftCell(gift: Gift, enabled: Boolean, onClick: () -> Unit) {
-    val (a, b) = tierColors(gift.tier)
     Column(
         Modifier
             .fillMaxWidth()
@@ -141,10 +152,10 @@ private fun GiftCell(gift: Gift, enabled: Boolean, onClick: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Box(
-            Modifier.height(40.dp).fillMaxWidth(0.7f).background(Brush.linearGradient(listOf(a, b)), RoundedCornerShape(12.dp)),
+            Modifier.height(44.dp).fillMaxWidth(0.7f).background(MaterialTheme.colorScheme.background, RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.CardGiftcard, contentDescription = null, tint = Color.White)
+            Icon(giftIcon(gift.id), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         }
         Text(giftName(gift.nameAr, gift.nameEn), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, maxLines = 1)
         Text("${gift.priceCoins}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

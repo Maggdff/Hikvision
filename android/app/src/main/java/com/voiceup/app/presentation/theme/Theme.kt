@@ -13,45 +13,59 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-/** هوية VoiceUp: أخضر زمردي مع سماوي وبرتقالي دافئ كلون إبراز. التطبيق فاتح، وشاشة الغرفة داكنة. */
+/**
+ * هوية VoiceUp (من تصميم «مجلس»): أسود مخضرّ عميق مع عنبري دافئ كلون إبراز.
+ * التطبيق داكن افتراضياً، وشاشة «حسابي» على خلفية كريمية فاتحة.
+ */
 object VoiceUpColors {
-    val Emerald = Color(0xFF0FB58A)
-    val Cyan = Color(0xFF06B6D4)
-    val Orange = Color(0xFFFF7A45)
-    val Violet = Color(0xFF8B5CF6)
+    val Amber = Color(0xFFF4A93B)
+    val OnAmber = Color(0xFF2A1A00)
+    val Ink = Color(0xFF0F1512)
+    val Surface = Color(0xFF17201B)
+    val Surface2 = Color(0xFF212C26)
+    val Cream = Color(0xFFF4EFE6)
+    val Muted = Color(0xFF8FA095)
+    val Line = Color(0x17F4EFE6)
 
-    // للاستخدام فوق خلفية الغرفة الداكنة
-    val Mint = Color(0xFF5EEAD4)
-    val Coral = Color(0xFFFF8A65)
+    // أسماء قديمة يستعملها كود الغرفة: كلها الآن العنبري
+    val Mint = Amber
+    val Coral = Amber
+    val Orange = Amber
+    val Emerald = Amber
+    val Cyan = Amber
+    val Violet = Amber
 
-    val AccentGradient = Brush.linearGradient(listOf(Emerald, Cyan))
+    val AccentGradient = Brush.linearGradient(listOf(Amber, Amber))
 }
 
 private val LightScheme = lightColorScheme(
-    primary = VoiceUpColors.Emerald,
-    onPrimary = Color.White,
-    secondary = VoiceUpColors.Cyan,
-    tertiary = VoiceUpColors.Orange,
-    background = Color(0xFFF4F8F7),
+    primary = VoiceUpColors.Amber,
+    onPrimary = VoiceUpColors.OnAmber,
+    secondary = Color(0xFF0F1512),
+    tertiary = VoiceUpColors.Amber,
+    background = Color(0xFFF6F1E7),
     surface = Color.White,
-    surfaceVariant = Color(0xFFE8F0EE),
-    onBackground = Color(0xFF14201D),
-    onSurface = Color(0xFF14201D),
-    onSurfaceVariant = Color(0xFF5E6F6B),
+    surfaceVariant = Color(0xFFEDE6D8),
+    onBackground = VoiceUpColors.Ink,
+    onSurface = VoiceUpColors.Ink,
+    onSurfaceVariant = Color(0xFF5C675F),
+    outline = Color(0xFFD8D0C0),
     error = Color(0xFFD93025),
 )
 
 private val DarkScheme = darkColorScheme(
-    primary = VoiceUpColors.Mint,
-    onPrimary = Color(0xFF00201B),
-    secondary = VoiceUpColors.Cyan,
-    tertiary = VoiceUpColors.Coral,
-    background = Color(0xFF0B1A1A),
-    surface = Color(0xFF14282A),
-    surfaceVariant = Color(0xFF1E3A3C),
-    onBackground = Color(0xFFEAF7F4),
-    onSurface = Color(0xFFEAF7F4),
-    onSurfaceVariant = Color(0xFFA3BDB8),
+    primary = VoiceUpColors.Amber,
+    onPrimary = VoiceUpColors.OnAmber,
+    secondary = VoiceUpColors.Surface2,
+    tertiary = VoiceUpColors.Amber,
+    background = VoiceUpColors.Ink,
+    surface = VoiceUpColors.Surface,
+    surfaceVariant = VoiceUpColors.Surface2,
+    onBackground = VoiceUpColors.Cream,
+    onSurface = VoiceUpColors.Cream,
+    onSurfaceVariant = VoiceUpColors.Muted,
+    outline = VoiceUpColors.Line,
+    error = Color(0xFFFF8A80),
 )
 
 private val LocalDark = compositionLocalOf { false }
@@ -59,12 +73,12 @@ private val LocalDark = compositionLocalOf { false }
 /** خلفية الشاشة حسب الثيم الحالي. */
 @Composable
 fun appBackground(): Brush =
-    if (LocalDark.current) Brush.verticalGradient(listOf(Color(0xFF123B3A), Color(0xFF0B1A1A)))
-    else Brush.verticalGradient(listOf(Color(0xFFDDF5EE), Color(0xFFF4F8F7)))
+    if (LocalDark.current) Brush.verticalGradient(listOf(VoiceUpColors.Ink, VoiceUpColors.Ink))
+    else Brush.verticalGradient(listOf(Color(0xFFF6F1E7), Color(0xFFF6F1E7)))
 
-/** dark=true للغرفة فقط. اتجاه RTL يُحدَّد تلقائياً من لغة الجهاز. */
+/** داكن افتراضياً؛ dark=false لشاشة «حسابي». اتجاه RTL يُحدَّد تلقائياً من لغة الجهاز. */
 @Composable
-fun VoiceUpTheme(dark: Boolean = false, content: @Composable () -> Unit) {
+fun VoiceUpTheme(dark: Boolean = true, content: @Composable () -> Unit) {
     val view = LocalView.current
     if (!view.isInEditMode) {
         // أيقونات شريط الحالة: داكنة على الخلفية الفاتحة وفاتحة على الداكنة؛ تُستعاد عند مغادرة الشاشة
@@ -78,7 +92,7 @@ fun VoiceUpTheme(dark: Boolean = false, content: @Composable () -> Unit) {
                 }
             }
             apply(!dark)
-            onDispose { apply(true) }
+            onDispose { apply(false) }
         }
     }
     CompositionLocalProvider(LocalDark provides dark) {

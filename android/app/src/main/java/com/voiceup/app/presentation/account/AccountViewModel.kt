@@ -3,6 +3,7 @@ package com.voiceup.app.presentation.account
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.voiceup.app.domain.model.Countries
+import com.voiceup.app.domain.model.Levels
 import com.voiceup.app.domain.model.UserProfile
 import com.voiceup.app.domain.repository.EconomyRepository
 import com.voiceup.app.domain.repository.ProfileRepository
@@ -24,6 +25,8 @@ data class AccountUiState(
     /** رصيد العملات؛ null حتى يُحمَّل. */
     val balance: Long? = null,
     val balanceFailed: Boolean = false,
+    /** مستويات الثروة والجاذبية؛ null حتى تُحمَّل أو إن تعذّر التحميل (لا تُعرض أرقام مختلقة). */
+    val levels: Levels? = null,
     /** invalid_name | invalid_bio | save_failed */
     val errorCode: String? = null,
 )
@@ -37,7 +40,23 @@ class AccountViewModel(
     private val _state = MutableStateFlow(AccountUiState(initial))
     val state: StateFlow<AccountUiState> = _state.asStateFlow()
 
-    init { refreshBalance() }
+    init {
+        refreshBalance()
+        refreshLevels()
+    }
+
+    fun refreshLevels() {
+        viewModelScope.launch {
+            try {
+                val l = economy.getLevels()
+                _state.update { it.copy(levels = l) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // تبقى المستويات مخفية؛ لا نعرض 0 كأنها حقيقة
+            }
+        }
+    }
 
     fun refreshBalance() {
         viewModelScope.launch {

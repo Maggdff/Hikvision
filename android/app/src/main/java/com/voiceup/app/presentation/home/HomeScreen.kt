@@ -21,7 +21,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,7 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.graphics.Color
@@ -72,31 +70,18 @@ fun HomeScreen(
         Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
             Text(
                 text = stringResource(R.string.home_title),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+                modifier = Modifier.padding(top = 18.dp, bottom = 12.dp),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                FilterChip(
-                    selected = filter.sort == RoomSort.Popular,
-                    onClick = { onSelectSort(RoomSort.Popular) },
-                    label = { Text(stringResource(R.string.home_sort_popular)) },
-                )
-                FilterChip(
-                    selected = filter.sort == RoomSort.Newest,
-                    onClick = { onSelectSort(RoomSort.Newest) },
-                    label = { Text(stringResource(R.string.home_sort_new)) },
-                )
-                FilterChip(
-                    selected = filter.country != null,
-                    onClick = { showCountryFilter = true },
-                    label = {
-                        Text(
-                            Countries.find(filter.country)?.let { countryName(it) }
-                                ?: stringResource(R.string.country_all),
-                        )
-                    },
-                )
+                PillChip(stringResource(R.string.home_sort_popular), filter.sort == RoomSort.Popular) { onSelectSort(RoomSort.Popular) }
+                PillChip(stringResource(R.string.home_sort_new), filter.sort == RoomSort.Newest) { onSelectSort(RoomSort.Newest) }
+                PillChip(
+                    Countries.find(filter.country)?.let { countryName(it) } ?: stringResource(R.string.country_all),
+                    filter.country != null,
+                ) { showCountryFilter = true }
             }
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 when (state) {
@@ -123,6 +108,8 @@ fun HomeScreen(
         ExtendedFloatingActionButton(
             onClick = { showCreate = true },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
         ) { Text(stringResource(R.string.home_create)) }
     }
 
@@ -287,22 +274,40 @@ private fun Message(title: String, body: String?, action: String? = null, onActi
     }
 }
 
-/** ألوان بطاقة الغرفة مشتقة من معرّفها، فتبقى ثابتة لنفس الغرفة. */
+/** ألوان غلاف بطاقة الغرفة (خلفية، حرف) مشتقة من معرّفها، فتبقى ثابتة لنفس الغرفة. */
 private val cardPalettes = listOf(
-    Color(0xFF0FB58A) to Color(0xFF0E7490),
-    Color(0xFFFF7A45) to Color(0xFFE5484D),
-    Color(0xFF3B82F6) to Color(0xFF06B6D4),
-    Color(0xFF8B5CF6) to Color(0xFF3B82F6),
-    Color(0xFFF59E0B) to Color(0xFFFF7A45),
+    Color(0xFF2B3A32) to Color(0xFFA9C9B5),
+    Color(0xFF3A3128) to Color(0xFFD9BC95),
+    Color(0xFF2F3440) to Color(0xFFA9B6D1),
+    Color(0xFF3B2F36) to Color(0xFFD2AEBF),
+    Color(0xFF2E3B3B) to Color(0xFFA5CFCB),
+    Color(0xFF38362B) to Color(0xFFCFC9A0),
 )
+
+@Composable
+private fun PillChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    Text(
+        text = label,
+        color = fg,
+        style = MaterialTheme.typography.labelLarge,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .background(bg, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
 
 @Composable
 private fun RoomGrid(rooms: List<VoiceRoom>, onOpen: (VoiceRoom) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(top = 14.dp, bottom = 88.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(rooms, key = { it.id }) { room -> RoomCard(room) { onOpen(room) } }
@@ -311,41 +316,62 @@ private fun RoomGrid(rooms: List<VoiceRoom>, onOpen: (VoiceRoom) -> Unit) {
 
 @Composable
 private fun RoomCard(room: VoiceRoom, onClick: () -> Unit) {
-    val (a, b) = cardPalettes[Math.floorMod(room.id.hashCode(), cardPalettes.size)]
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .height(150.dp)
-            .background(Brush.linearGradient(listOf(a, b)), RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column {
-            if (room.isPrivate) {
-                Text(
-                    stringResource(R.string.room_private_badge),
-                    style = MaterialTheme.typography.labelMedium, color = Color.White,
-                )
-            }
-            room.topic?.let {
-                Text(
-                    it, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            }
+    val (bg, letterColor) = cardPalettes[Math.floorMod(room.id.hashCode(), cardPalettes.size)]
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(128.dp)
+                .background(bg, RoundedCornerShape(18.dp)),
+        ) {
             Text(
-                room.title, style = MaterialTheme.typography.titleMedium, color = Color.White,
-                maxLines = 2, overflow = TextOverflow.Ellipsis,
+                text = room.title.trim().take(1),
+                color = letterColor,
+                style = MaterialTheme.typography.displayMedium,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            // وسم: خاصة، أو موضوع الغرفة إن وُجد
+            val tag = if (room.isPrivate) stringResource(R.string.room_private_badge) else room.topic
+            if (!tag.isNullOrBlank()) {
+                Text(
+                    text = tag,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .background(Color(0xCC0F1512), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+            // عدد الجالسين على المنصة (بيانات حقيقية من الخادم)
+            Text(
+                text = stringResource(R.string.home_seats, room.seatedCount, room.maxSeats),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp)
+                    .background(Color(0xCC0F1512), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 8.dp, start = 2.dp, end = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             Text(
-                stringResource(R.string.home_seats, room.seatedCount, room.maxSeats),
-                style = MaterialTheme.typography.labelMedium, color = Color.White,
+                room.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
             )
             Countries.find(room.country)?.let {
-                Text(countryName(it), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f))
+                Text(
+                    countryName(it), style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

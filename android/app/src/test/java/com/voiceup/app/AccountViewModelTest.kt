@@ -114,4 +114,23 @@ class AccountViewModelTest {
         assertEquals(1_000L, v.state.value.balance)
         assertFalse(v.state.value.balanceFailed)
     }
+
+    @Test fun levelsLoadOnCreation() {
+        economy.levels = com.voiceup.app.domain.model.Levels(
+            com.voiceup.app.domain.model.LevelInfo(500, 4, 800),
+            com.voiceup.app.domain.model.LevelInfo(0, 1, 50),
+        )
+        val l = vm().state.value.levels!!
+        assertEquals(4, l.wealth.level)
+        assertEquals(1, l.charm.level)
+    }
+
+    @Test fun levelsFailureLeavesThemHiddenNotFaked() {
+        economy.levelsError = com.voiceup.app.domain.model.ApiException(0, "network")
+        val v = vm()
+        assertNull(v.state.value.levels)
+        economy.levelsError = null
+        v.refreshLevels()
+        assertEquals(1, v.state.value.levels!!.wealth.level)
+    }
 }

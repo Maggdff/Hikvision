@@ -2,11 +2,13 @@ package com.voiceup.app.domain.repository
 
 import com.voiceup.app.domain.model.Gift
 import com.voiceup.app.domain.model.GiftReceipt
+import com.voiceup.app.domain.model.Levels
 
 /** كل الدوال ترمي ApiException عند الفشل. */
 interface EconomyRepository {
     suspend fun getBalance(): Long
     suspend fun listGifts(): List<Gift>
+    suspend fun getLevels(): Levels
 
     /**
      * idempotencyKey: معرّف فريد للعملية. إعادة الإرسال بنفس المفتاح بعد انقطاع الشبكة

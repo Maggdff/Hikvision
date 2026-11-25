@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.voiceup.app.R
 import com.voiceup.app.domain.model.Countries
 import com.voiceup.app.presentation.components.Avatar
+import com.voiceup.app.presentation.components.LevelBadge
+import com.voiceup.app.presentation.components.LevelKind
 import com.voiceup.app.presentation.countryName
 import com.voiceup.app.presentation.home.CountryPickerDialog
 import com.voiceup.app.presentation.theme.VoiceUpColors
@@ -69,22 +71,51 @@ fun AccountScreen(
             }
         }
 
-        // رصيد العملات (للقراءة فقط؛ الشحن عبر Google Play يُضاف لاحقاً)
-        Row(
-            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp)).padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+        // رصيد العملات (للقراءة فقط؛ الشحن عبر Google Play يُضاف لاحقاً): بطاقة داكنة كما في التصميم
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(VoiceUpColors.Ink, RoundedCornerShape(18.dp))
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(stringResource(R.string.account_coins), style = MaterialTheme.typography.titleMedium)
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_coin),
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+            )
             Text(
                 text = when {
                     state.balance != null -> "${state.balance}"
                     state.balanceFailed -> stringResource(R.string.account_coins_unavailable)
                     else -> "…"
                 },
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = VoiceUpColors.Cream,
             )
+            Text(
+                stringResource(R.string.account_coins),
+                style = MaterialTheme.typography.labelMedium,
+                color = VoiceUpColors.Amber,
+            )
+        }
+
+        state.levels?.let { lv ->
+            Row(
+                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp)).padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    LevelBadge(LevelKind.Wealth, lv.wealth.level)
+                    Text(stringResource(R.string.account_wealth_level), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    LevelBadge(LevelKind.Charm, lv.charm.level)
+                    Text(stringResource(R.string.account_charm_level), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
 
         if (!state.editing) {

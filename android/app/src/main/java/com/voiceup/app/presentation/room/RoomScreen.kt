@@ -502,17 +502,17 @@ private fun GiftBannerView(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .fillMaxWidth()
                 .background(
-                    androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(VoiceUpColors.Orange, VoiceUpColors.Coral)),
+                    VoiceUpColors.Amber,
                     androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(Icons.Rounded.CardGiftcard, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White)
+            Icon(Icons.Rounded.CardGiftcard, contentDescription = null, tint = VoiceUpColors.OnAmber)
             Text(
                 stringResource(R.string.chat_gift, from, to, giftName(banner.event.nameAr, banner.event.nameEn)),
-                color = androidx.compose.ui.graphics.Color.White,
+                color = VoiceUpColors.OnAmber,
                 style = MaterialTheme.typography.titleSmall,
             )
         }
