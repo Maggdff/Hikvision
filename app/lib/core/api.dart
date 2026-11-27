@@ -1,8 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 
 import 'config.dart';
 
@@ -32,7 +32,7 @@ class ApiException implements Exception {
 class Api {
   Api._();
   static final Api i = Api._();
-  final _client = http.Client();
+  final _client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
 
   Future<Map<String, String>> _headers({String? idemKey}) async {
     final user = FirebaseAuth.instance.currentUser;
@@ -53,16 +53,18 @@ class Api {
 
   Future<dynamic> _send(String method, String path, {Object? body, String? idemKey}) async {
     try {
-      final req = http.Request(method, _uri(path))..headers.addAll(await _headers(idemKey: idemKey));
-      if (body != null) req.body = jsonEncode(body);
-      final res = await http.Response.fromStream(await _client.send(req).timeout(const Duration(seconds: 20)));
+      final req = await _client.openUrl(method, _uri(path)).timeout(const Duration(seconds: 20));
+      (await _headers(idemKey: idemKey)).forEach(req.headers.set);
+      if (body != null) req.add(utf8.encode(jsonEncode(body)));
+      final res = await (await req.close()).timeout(const Duration(seconds: 20));
+      final text = await res.transform(utf8.decoder).join();
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        if (res.body.isEmpty) return null;
-        return jsonDecode(utf8.decode(res.bodyBytes));
+        if (text.isEmpty) return null;
+        return jsonDecode(text);
       }
       var code = 'http_${res.statusCode}';
       try {
-        final j = jsonDecode(res.body);
+        final j = jsonDecode(text);
         if (j is Map && j['error'] is String) code = j['error'] as String;
         if (j is Map && j['message'] is String && j['error'] == null) code = j['message'] as String;
       } catch (_) {}
