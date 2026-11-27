@@ -214,6 +214,11 @@ export class RoomService {
       [roomId],
     );
     const points = new Map<string, number>(pts.rows.map((x) => [x.recipient_uid as string, Number(x.pts)]));
+    const fr = await this.pool.query(
+      `SELECT uid, frame_id FROM user_equipped_frame WHERE uid = ANY($1::text[])`,
+      [[...new Set<string>([room.rows[0].owner_uid as string, ...seats.rows.map((x) => x.uid as string)])]],
+    );
+    const frames = new Map<string, string>(fr.rows.map((x) => [x.uid as string, x.frame_id as string]));
     const giftTotal = [...points.values()].reduce((a, b) => a + b, 0);
     const myRole = await this.roleOf(this.pool, roomId, uid);
     const mine = seats.rows.find((x) => x.uid === uid);
@@ -229,7 +234,9 @@ export class RoomService {
       giftTotal,
       seats: seats.rows.map((x) => ({
         seat: x.seat_no as number, uid: x.uid as string, role: x.role as Role, points: points.get(x.uid as string) ?? 0,
+        frame: frames.get(x.uid as string) ?? null,
       })),
+      ownerFrame: frames.get(room.rows[0].owner_uid as string) ?? null,
     };
   }
 

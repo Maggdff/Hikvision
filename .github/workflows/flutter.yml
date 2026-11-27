@@ -77,10 +77,14 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
-      - name: Build debug APK
-        run: flutter build apk --debug --dart-define=VOICEUP_API_URL="$VOICEUP_API_URL" $FB_DEFINES
+      # نسخة release صغيرة: R8 + حذف الرموز + ملف لكل معمارية (الـ 170MB كانت debug لكل المعماريات)
+      - name: Build release APKs (split per ABI)
+        run: |
+          flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols \
+            --dart-define=VOICEUP_API_URL="$VOICEUP_API_URL" $FB_DEFINES
+          ls -la build/app/outputs/flutter-apk/*.apk | awk '{printf "%s  %.1f MB\n", $NF, $5/1048576}'
 
       - uses: actions/upload-artifact@v4
         with:
-          name: voiceup-flutter-debug-apk
-          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          name: voiceup-flutter-release-apks
+          path: app/build/app/outputs/flutter-apk/*-release.apk

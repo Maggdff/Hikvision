@@ -125,8 +125,23 @@ export function buildApp(deps?: AppDeps) {
     api.get<{ Params: { uid: string } }>('/users/:uid/social', async (req) => {
       const target = uidParam(req.params.uid);
       const c = await social.counts(target);
-      return { followers: c.followers, followingCount: c.following, iFollow: await social.isFollowing(req.uid, target) };
+      return { followers: c.followers, followingCount: c.following, iFollow: await social.isFollowing(req.uid, target), frame: await economy.frameOf(target) };
     });
+    // المتجر: الإطارات المتحركة (SVGA). الشراء عبر الدفتر، والتفعيل لما يملكه المستخدم فقط
+    api.get('/store/frames', async (req) => ({ frames: await economy.listFrames(req.uid) }));
+    api.post<{ Params: { id: string } }>('/store/frames/:id/buy', async (req) => {
+      const key = req.headers['idempotency-key'];
+      if (typeof key !== 'string') throw badRequest('invalid_request');
+      return economy.buyFrame(req.uid, req.params.id, key);
+    });
+    api.put('/me/frame', async (req, reply) => {
+      const b = (req.body ?? {}) as { frameId?: unknown };
+      if (b.frameId !== null && typeof b.frameId !== 'string') throw badRequest('invalid_request');
+      await economy.equipFrame(req.uid, b.frameId as string | null);
+      return reply.status(204).send();
+    });
+    api.get('/me', async (req) => ({ uid: req.uid, isAdmin: admins.has(req.uid), frame: await economy.frameOf(req.uid) }));
+
     api.get('/banners', async () => ({ banners: await social.activeBanners() }));
 
     api.get<{ Params: { id: string } }>('/rooms/:id', async (req) =>

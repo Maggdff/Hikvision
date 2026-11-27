@@ -18,16 +18,18 @@ class Seat {
   final int seat;
   final String uid, role;
   final int points;
+  final String? frame;
   Seat.fromJson(Map j)
       : seat = j['seat'] as int,
         uid = j['uid'] as String,
         role = (j['role'] ?? 'speaker') as String,
-        points = ((j['points'] ?? 0) as num).toInt();
+        points = ((j['points'] ?? 0) as num).toInt(),
+        frame = j['frame'] as String?;
 }
 
 class RoomState {
   final String id, title, ownerUid, myRole;
-  final String? topic;
+  final String? topic, ownerFrame;
   final int maxSeats, giftTotal;
   final int? mySeat;
   final List<Seat> seats;
@@ -41,6 +43,7 @@ class RoomState {
         myRole = (j['myRole'] ?? 'listener') as String,
         mySeat = j['mySeat'] as int?,
         seats = ((j['seats'] ?? []) as List).map((e) => Seat.fromJson(e as Map)).toList(),
+        ownerFrame = j['ownerFrame'] as String?,
         giftTotal = ((j['giftTotal'] ?? 0) as num).toInt(),
         createdAt = DateTime.tryParse((j['createdAt'] ?? '') as String);
   Seat? seatAt(int i) {
@@ -119,4 +122,16 @@ String groupedNumber(int n) {
     b.write(s[i]);
   }
   return b.toString();
+}
+
+class FrameItem {
+  final String id, nameAr;
+  final int priceCoins;
+  final bool owned, equipped;
+  FrameItem.fromJson(Map j)
+      : id = j['id'] as String,
+        nameAr = j['nameAr'] as String,
+        priceCoins = (j['priceCoins'] as num).toInt(),
+        owned = (j['owned'] ?? false) as bool,
+        equipped = (j['equipped'] ?? false) as bool;
 }

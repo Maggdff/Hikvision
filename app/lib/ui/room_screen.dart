@@ -304,7 +304,7 @@ class _RoomScreenState extends State<RoomScreen> {
       const SizedBox(height: 24),
       Column(children: [
         Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
-          Avatar(name: hostName, key2: s.ownerUid, size: 80, ring: speaking.contains(s.ownerUid)),
+          Avatar(name: hostName, key2: s.ownerUid, size: 80, ring: speaking.contains(s.ownerUid), frame: s.ownerFrame),
           const Positioned(top: -10, child: Icn(Ic.crown, size: 18, color: C.amber, sw: 1.8)),
         ]),
         const SizedBox(height: 12),
@@ -362,7 +362,7 @@ class _RoomScreenState extends State<RoomScreen> {
                   child: const Icn(Ic.mic, size: 21.28, color: C.muted, sw: 1.5),
                 )
               : Stack(clipBehavior: Clip.none, children: [
-                  Avatar(name: Profiles.peek(seat.uid)?.name ?? '', key2: seat.uid, size: 56, ring: speaking.contains(seat.uid)),
+                  Avatar(name: Profiles.peek(seat.uid)?.name ?? '', key2: seat.uid, size: 56, ring: speaking.contains(seat.uid), frame: seat.frame),
                   if (muted.contains(seat.uid) || (seat.uid == me && !voice.micOn))
                     Positioned(
                       bottom: -1, right: -1,

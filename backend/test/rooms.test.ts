@@ -400,8 +400,8 @@ d('rooms API (Postgres)', () => {
     const s = (await call('uid-l1', 'GET', `/rooms/${id}`)).json();
     expect(s).toMatchObject({ id, ownerUid: 'uid-owner', maxSeats: 9, myRole: 'moderator', mySeat: 1 });
     expect(s.seats).toEqual([
-      { seat: 0, uid: 'uid-owner', role: 'owner', points: 0 },
-      { seat: 1, uid: 'uid-l1', role: 'moderator', points: 0 },
+      { seat: 0, uid: 'uid-owner', role: 'owner', points: 0, frame: null },
+      { seat: 1, uid: 'uid-l1', role: 'moderator', points: 0, frame: null },
     ]);
     const other = (await call('uid-x', 'GET', `/rooms/${id}`)).json();
     expect(other).toMatchObject({ myRole: 'member', mySeat: null });

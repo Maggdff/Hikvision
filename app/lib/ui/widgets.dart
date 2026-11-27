@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../core/colors.dart';
+import 'svga.dart';
 
 TextStyle kufi(double size, {FontWeight w = FontWeight.w600, Color color = C.cream, double? height}) =>
     GoogleFonts.notoKufiArabic(fontSize: size, fontWeight: w, color: color, height: height);
@@ -15,17 +16,20 @@ class Avatar extends StatelessWidget {
   final String key2;
   final double size;
   final bool ring;
-  const Avatar({super.key, required this.name, required this.key2, required this.size, this.ring = false});
+  /// معرّف الإطار المتحرك (SVGA) إن وُجد، مثل 'vip6'.
+  final String? frame;
+  const Avatar({super.key, required this.name, required this.key2, required this.size, this.ring = false, this.frame});
 
   @override
   Widget build(BuildContext context) {
     final p = C.paletteFor(key2);
     final letter = name.trim().isEmpty ? '؟' : String.fromCharCode(name.trim().runes.first);
+    final frameAsset = frame == null ? null : SvgaAssets.frames[frame];
     return SizedBox(
       width: size,
       height: size,
       child: Stack(clipBehavior: Clip.none, children: [
-        if (ring)
+        if (ring && frameAsset == null)
           Positioned(
             left: -4, right: -4, top: -4, bottom: -4,
             child: DecoratedBox(
@@ -39,6 +43,12 @@ class Avatar extends StatelessWidget {
           decoration: BoxDecoration(shape: BoxShape.circle, color: p[0]),
           child: Text(letter, style: kufi(size * 0.38, color: p[1])),
         ),
+        // الإطار أكبر من الصورة بـ 1.7 مرة؛ فتحته الداخلية تطابق الصورة. يُرسم فوقها دون قص.
+        if (frameAsset != null)
+          Positioned(
+            left: -size * 0.35, top: -size * 0.35, width: size * 1.7, height: size * 1.7,
+            child: IgnorePointer(child: SvgaView(asset: frameAsset)),
+          ),
       ]),
     );
   }

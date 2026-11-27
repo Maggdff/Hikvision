@@ -19,6 +19,7 @@ dependencies:
   firebase_auth: ^4.17.8
   cloud_firestore: ^4.15.8
   livekit_client: ^2.1.0
+  svgaplayer_flutter: ^2.2.0
 
 dev_dependencies:
   flutter_test:
@@ -28,3 +29,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: false
+  assets:
+    - assets/svga/
+    - assets/gifts/

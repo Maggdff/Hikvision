@@ -6,6 +6,7 @@ import '../core/api.dart';
 import '../core/colors.dart';
 import '../core/icons.dart';
 import '../core/models.dart';
+import 'store_screen.dart';
 import 'widgets.dart';
 
 /// شاشة "أنا" بتصميم Majlis الفاتح. تعرض بيانات حقيقية فقط.
@@ -20,6 +21,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String name = '', username = '';
   int? balance, followers, following;
   LevelInfo? wealth, charm;
+  String? frame;
+  bool isAdmin = false;
   String? error;
   bool loading = true;
 
@@ -39,6 +42,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final w = await Api.i.get('/wallet') as Map;
       final lv = await Api.i.get('/levels') as Map;
       final so = await Api.i.get('/users/$uid/social') as Map;
+      final me = await Api.i.get('/me') as Map;
       if (!mounted) return;
       setState(() {
         balance = (w['balance'] as num).toInt();
@@ -46,12 +50,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
         charm = LevelInfo.fromJson(lv['charm'] as Map);
         followers = (so['followers'] as num).toInt();
         following = (so['followingCount'] as num).toInt();
+        frame = me['frame'] as String?;
+        isAdmin = (me['isAdmin'] ?? false) as bool;
         loading = false;
       });
     } on ApiException catch (e) {
       if (mounted) setState(() { error = e.message; loading = false; });
     } catch (_) {
       if (mounted) setState(() { error = 'تعذّر تحميل الملف الشخصي'; loading = false; });
+    }
+  }
+
+  /// منح عملات تجريبية لحسابي عبر مسار المنح الإداري الموجود (يمرّ بالدفتر ويتطلب ADMIN_UIDS).
+  Future<void> _testCoins() async {
+    try {
+      final r = await Api.i.post('/admin/grants',
+          body: {'uid': uid, 'amount': 50000, 'reason': 'عملات تجريبية للاختبار'}, idemKey: Api.newKey()) as Map;
+      if (!mounted) return;
+      setState(() => balance = (r['balance'] as num).toInt());
+      toast(context, 'تمت إضافة 50,000 عملة تجريبية');
+    } on ApiException catch (e) {
+      if (mounted) toast(context, e.message);
     }
   }
 
@@ -133,8 +152,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ]),
                       const SizedBox(height: 28),
                       Row(children: [
-                        Avatar(name: name, key2: uid, size: 84),
-                        const SizedBox(width: 16),
+                        Padding(padding: const EdgeInsets.all(14), child: Avatar(name: name, key2: uid, size: 84, frame: frame)),
+                        const SizedBox(width: 2),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(name, style: _k(21), maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -178,6 +197,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _row(Ic.star, 'مستوى الثروة', trailing: _lvl(wealth?.level ?? 1)),
                       const SizedBox(height: 8),
                       _row(Ic.crown, 'مستوى الجاذبية', trailing: _lvl(charm?.level ?? 1)),
+                      const SizedBox(height: 8),
+                      _row(Ic.crown, 'متجر الإطارات', onTap: () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const StoreScreen()));
+                        _load();
+                      }),
+                      if (isAdmin) ...[
+                        const SizedBox(height: 8),
+                        _row(Ic.gift, 'عملات تجريبية (50,000)', onTap: _testCoins),
+                      ],
                       const SizedBox(height: 8),
                       _row(Ic.power, 'تسجيل الخروج', onTap: _signOut),
                     ]),

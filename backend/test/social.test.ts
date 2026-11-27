@@ -46,9 +46,9 @@ d('social: follows, followed-rooms feed, banners (Postgres)', () => {
     expect((await call('uid-a', 'PUT', '/follows/uid-b')).statusCode).toBe(204);
     expect((await call('uid-c', 'PUT', '/follows/uid-b')).statusCode).toBe(204);
     const b = (await call('uid-a', 'GET', '/users/uid-b/social')).json();
-    expect(b).toEqual({ followers: 2, followingCount: 0, iFollow: true });
+    expect(b).toEqual({ followers: 2, followingCount: 0, iFollow: true, frame: null });
     const a = (await call('uid-b', 'GET', '/users/uid-a/social')).json();
-    expect(a).toEqual({ followers: 0, followingCount: 1, iFollow: false });
+    expect(a).toEqual({ followers: 0, followingCount: 1, iFollow: false, frame: null });
   });
 
   it('cannot follow yourself; unfollow removes', async () => {

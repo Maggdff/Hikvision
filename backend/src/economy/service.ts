@@ -206,4 +206,72 @@ export class EconomyService {
       return { ok: true as const, giftMessageId: Number(msg.rows[0].id), balance: bal - price, replayed: false };
     });
   }
+
+  // ───────────── متجر الإطارات ─────────────
+
+  async listFrames(uid: string): Promise<Array<{ id: string; nameAr: string; nameEn: string; priceCoins: number; owned: boolean; equipped: boolean }>> {
+    const r = await this.pool.query(
+      `SELECT f.id, f.name_ar, f.name_en, f.price_coins,
+              (u.uid IS NOT NULL) AS owned, (e.frame_id IS NOT NULL) AS equipped
+         FROM frames f
+         LEFT JOIN user_frames u ON u.frame_id = f.id AND u.uid = $1
+         LEFT JOIN user_equipped_frame e ON e.frame_id = f.id AND e.uid = $1
+        WHERE f.active ORDER BY f.sort_order, f.price_coins`,
+      [uid],
+    );
+    return r.rows.map((x) => ({
+      id: x.id, nameAr: x.name_ar, nameEn: x.name_en, priceCoins: x.price_coins, owned: x.owned, equipped: x.equipped,
+    }));
+  }
+
+  /** شراء إطار: خصم من المحفظة وقيد مزدوج إلى حساب مبيعات المتجر، بمفتاح idempotency. */
+  async buyFrame(uid: string, frameId: string, key: string): Promise<{ ok: true; balance: number; replayed: boolean }> {
+    if (!/^[A-Za-z0-9_-]{8,64}$/.test(key)) throw badRequest('invalid_key');
+    return this.tx(async (c) => {
+      const wallet = await this.lockWallet(c, uid);
+      const idem = `frame:${uid}:${key}`;
+      if ((await c.query('SELECT 1 FROM ledger_transactions WHERE idempotency_key = $1', [idem])).rowCount) {
+        return { ok: true as const, balance: await this.balanceOf(c, wallet), replayed: true };
+      }
+      const f = await c.query('SELECT id, price_coins FROM frames WHERE id = $1 AND active', [frameId]);
+      if (!f.rows[0]) throw notFound('frame_not_found');
+      if ((await c.query('SELECT 1 FROM user_frames WHERE uid = $1 AND frame_id = $2', [uid, frameId])).rowCount) {
+        throw conflict('already_owned');
+      }
+      const price = Number(f.rows[0].price_coins);
+      const bal = await this.balanceOf(c, wallet);
+      if (bal < price) throw paymentRequired('insufficient_funds');
+      const sink = await this.platformAccount(c, 'platform:store_sales');
+      const t = await c.query(
+        `INSERT INTO ledger_transactions(idempotency_key, type, metadata) VALUES ($1,'wallet_debit',$2) RETURNING id`,
+        [idem, JSON.stringify({ kind: 'frame', uid, frameId, price })],
+      );
+      const txId = t.rows[0].id;
+      await c.query(`INSERT INTO ledger_entries(transaction_id, account_id, direction, amount) VALUES ($1,$2,'debit',$3)`, [txId, wallet, price]);
+      await c.query(`INSERT INTO ledger_entries(transaction_id, account_id, direction, amount) VALUES ($1,$2,'credit',$3)`, [txId, sink, price]);
+      await c.query('INSERT INTO user_frames(uid, frame_id, ledger_tx_id) VALUES ($1,$2,$3)', [uid, frameId, txId]);
+      return { ok: true as const, balance: bal - price, replayed: false };
+    });
+  }
+
+  /** تفعيل إطار مملوك، أو إزالة الإطار بتمرير null. */
+  async equipFrame(uid: string, frameId: string | null): Promise<void> {
+    if (frameId === null) {
+      await this.pool.query('DELETE FROM user_equipped_frame WHERE uid = $1', [uid]);
+      return;
+    }
+    if (!(await this.pool.query('SELECT 1 FROM user_frames WHERE uid = $1 AND frame_id = $2', [uid, frameId])).rowCount) {
+      throw forbidden('frame_not_owned');
+    }
+    await this.pool.query(
+      `INSERT INTO user_equipped_frame(uid, frame_id) VALUES ($1,$2)
+       ON CONFLICT (uid) DO UPDATE SET frame_id = EXCLUDED.frame_id`,
+      [uid, frameId],
+    );
+  }
+
+  async frameOf(uid: string): Promise<string | null> {
+    const r = await this.pool.query('SELECT frame_id FROM user_equipped_frame WHERE uid = $1', [uid]);
+    return (r.rows[0]?.frame_id as string | undefined) ?? null;
+  }
 }

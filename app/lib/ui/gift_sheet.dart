@@ -5,6 +5,7 @@ import '../core/colors.dart';
 import '../core/icons.dart';
 import '../core/models.dart';
 import '../core/profiles.dart';
+import 'svga.dart';
 import 'widgets.dart';
 
 /// ورقة الهدايا: اختيار المستلم من أصحاب المقاعد ثم الهدية ثم إرسال (الخصم من الخادم/الدفتر).
@@ -168,7 +169,9 @@ class _GiftSheetState extends State<GiftSheet> {
                 width: 56, height: 56,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: C.surface2, borderRadius: BorderRadius.circular(16)),
-                child: Icn(Ic.forGift(g.id), size: 30, color: C.amber, sw: 1.5),
+                child: g.id == 'bugatti'
+                    ? ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.asset('assets/gifts/bugatti.webp', width: 56, height: 56, fit: BoxFit.cover))
+                    : Icn(Ic.forGift(g.id), size: 30, color: C.amber, sw: 1.5),
               ),
               const SizedBox(height: 8),
               Text(g.nameAr, style: plex(12)),
@@ -196,11 +199,14 @@ class GiftEffect extends StatefulWidget {
 }
 
 class _GiftEffectState extends State<GiftEffect> with SingleTickerProviderStateMixin {
-  late final AnimationController c;
+  AnimationController? c;
+
+  String? get _svga => SvgaAssets.gifts[widget.gift.id];
 
   @override
   void initState() {
     super.initState();
+    if (_svga != null) return; // تأثير SVGA يُنهي نفسه عند اكتمال الحركة
     final ms = widget.gift.tier == 'large' ? 4400 : widget.gift.tier == 'medium' ? 3000 : 2200;
     c = AnimationController(vsync: this, duration: Duration(milliseconds: ms))
       ..addStatusListener((s) {
@@ -211,18 +217,22 @@ class _GiftEffectState extends State<GiftEffect> with SingleTickerProviderStateM
 
   @override
   void dispose() {
-    c.dispose();
+    c?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final svga = _svga;
+    if (svga != null) {
+      return IgnorePointer(child: SvgaView(asset: svga, loop: false, fit: BoxFit.contain, onFinished: widget.onDone));
+    }
     final big = widget.gift.tier == 'large' ? 150.0 : widget.gift.tier == 'medium' ? 110.0 : 76.0;
     return IgnorePointer(
       child: AnimatedBuilder(
-        animation: c,
+        animation: c!,
         builder: (_, __) {
-          final t = c.value;
+          final t = c!.value;
           final scale = Curves.easeOutBack.transform((t * 4).clamp(0.0, 1.0));
           final fade = t < .75 ? 1.0 : (1 - (t - .75) / .25);
           return Opacity(
