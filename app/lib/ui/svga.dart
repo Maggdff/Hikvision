@@ -14,10 +14,10 @@ class SvgaAssets {
 
 // ───────────────────────── محلّل SVGA 2.x (protobuf + zlib) ─────────────────────────
 
-class _Draw {
+class SvgaDraw {
   final String key;
   final double alpha, lx, ly, lw, lh, a, b, c, d, tx, ty;
-  _Draw(this.key, this.alpha, this.lx, this.ly, this.lw, this.lh, this.a, this.b, this.c, this.d, this.tx, this.ty);
+  SvgaDraw(this.key, this.alpha, this.lx, this.ly, this.lw, this.lh, this.a, this.b, this.c, this.d, this.tx, this.ty);
 }
 
 class _Reader {
@@ -66,7 +66,7 @@ class SvgaMovie {
   final double viewW, viewH;
   final int fps, frameCount;
   final Map<String, Uint8List> png;
-  final List<List<_Draw>> perFrame;
+  final List<List<SvgaDraw>> perFrame;
   SvgaMovie._(this.viewW, this.viewH, this.fps, this.frameCount, this.png, this.perFrame);
 
   Duration get duration => Duration(milliseconds: (frameCount * 1000 / fps).round());
@@ -126,12 +126,12 @@ class SvgaMovie {
     }
     if (vw <= 0 || vh <= 0 || frames <= 0 || fps <= 0) throw const FormatException('SVGA غير صالح');
 
-    final per = List.generate(frames, (_) => <_Draw>[]);
+    final per = List.generate(frames, (_) => <SvgaDraw>[]);
     for (final s in sprites) {
       if (s.key == null || !png.containsKey(s.key)) continue;
       for (var i = 0; i < s.frames.length && i < frames; i++) {
         final fr = s.frames[i];
-        if (fr.alpha > 0.001) per[i].add(_Draw(s.key!, fr.alpha, fr.lx, fr.ly, fr.lw, fr.lh, fr.a, fr.b, fr.c, fr.d, fr.tx, fr.ty));
+        if (fr.alpha > 0.001) per[i].add(SvgaDraw(s.key!, fr.alpha, fr.lx, fr.ly, fr.lw, fr.lh, fr.a, fr.b, fr.c, fr.d, fr.tx, fr.ty));
       }
     }
     return SvgaMovie._(vw, vh, fps, frames, png, per);
