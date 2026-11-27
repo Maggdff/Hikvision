@@ -255,7 +255,7 @@ d('rooms API (Postgres)', () => {
     const id = await makeRoom();
     const list = (await call('uid-a', 'GET', '/rooms')).json().rooms;
     expect(list).toHaveLength(1);
-    expect(list[0]).toMatchObject({ id, ownerUid: 'uid-owner', seatedCount: 1, maxSeats: 8 });
+    expect(list[0]).toMatchObject({ id, ownerUid: 'uid-owner', seatedCount: 1, maxSeats: 9 });
   });
 
   it('allows only one open room per owner, even concurrently', async () => {
@@ -311,7 +311,7 @@ d('rooms API (Postgres)', () => {
   });
 
   it('concurrent approvals never exceed the seats or reuse a seat number', async () => {
-    const id = await makeRoom(); // 8 مقاعد، المالك يشغل واحداً → 7 متاحة
+    const id = await makeRoom(); // 9 مقاعد، المالك يشغل واحداً → 8 متاحة
     const users = Array.from({ length: 12 }, (_, i) => `uid-u${i}`);
     const reqs = await Promise.all(users.map((u) => call(u, 'POST', `/rooms/${id}/seat-requests`)));
     const ids = reqs.map((r) => r.json().id as string);
@@ -319,12 +319,12 @@ d('rooms API (Postgres)', () => {
     const results = await Promise.all(
       ids.map((rid) => call('uid-owner', 'POST', `/rooms/${id}/seat-requests/${rid}/approve`)),
     );
-    expect(results.filter((r) => r.statusCode === 200)).toHaveLength(7);
-    expect(results.filter((r) => r.statusCode === 409)).toHaveLength(5);
+    expect(results.filter((r) => r.statusCode === 200)).toHaveLength(8);
+    expect(results.filter((r) => r.statusCode === 409)).toHaveLength(4);
 
     const seats = await pool.query('SELECT seat_no, uid FROM room_seats WHERE room_id = $1', [id]);
-    expect(seats.rowCount).toBe(8);
-    expect(new Set(seats.rows.map((r) => r.seat_no)).size).toBe(8);
+    expect(seats.rowCount).toBe(9);
+    expect(new Set(seats.rows.map((r) => r.seat_no)).size).toBe(9);
   });
 
   it('leaving a seat revokes publish; owner cannot leave', async () => {
@@ -398,10 +398,10 @@ d('rooms API (Postgres)', () => {
     await seatUser(id, 'uid-l1');
     await call('uid-owner', 'PUT', `/rooms/${id}/moderators/uid-l1`);
     const s = (await call('uid-l1', 'GET', `/rooms/${id}`)).json();
-    expect(s).toMatchObject({ id, ownerUid: 'uid-owner', maxSeats: 8, myRole: 'moderator', mySeat: 1 });
+    expect(s).toMatchObject({ id, ownerUid: 'uid-owner', maxSeats: 9, myRole: 'moderator', mySeat: 1 });
     expect(s.seats).toEqual([
-      { seat: 0, uid: 'uid-owner', role: 'owner' },
-      { seat: 1, uid: 'uid-l1', role: 'moderator' },
+      { seat: 0, uid: 'uid-owner', role: 'owner', points: 0 },
+      { seat: 1, uid: 'uid-l1', role: 'moderator', points: 0 },
     ]);
     const other = (await call('uid-x', 'GET', `/rooms/${id}`)).json();
     expect(other).toMatchObject({ myRole: 'member', mySeat: null });

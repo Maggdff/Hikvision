@@ -150,4 +150,8 @@
     <string name="account_coins_unavailable">Could not load balance</string>
     <string name="account_wealth_level">Wealth level</string>
     <string name="account_charm_level">Charm level</string>
+    <string name="room_welcome">Welcome to the room. Please keep the conversation respectful</string>
+    <string name="room_menu">Room menu</string>
+    <string name="gift_select">Choose a gift</string>
+    <string name="gift_send">Send</string>
 </resources>

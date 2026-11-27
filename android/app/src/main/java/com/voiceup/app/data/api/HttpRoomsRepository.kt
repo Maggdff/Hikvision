@@ -27,7 +27,7 @@ import okhttp3.OkHttpClient
     val createdAt: String = "",
 )
 @Serializable private data class RoomListDto(val rooms: List<RoomDto>)
-@Serializable private data class SeatDto(val seat: Int, val uid: String, val role: String)
+@Serializable private data class SeatDto(val seat: Int, val uid: String, val role: String, val points: Long = 0)
 @Serializable private data class RoomStateDto(
     val id: String,
     val title: String,
@@ -37,6 +37,8 @@ import okhttp3.OkHttpClient
     val myRole: String,
     val mySeat: Int? = null,
     val seats: List<SeatDto> = emptyList(),
+    val createdAt: String = "",
+    val giftTotal: Long = 0,
 )
 @Serializable private data class JoinDto(val token: String, val url: String, val role: String, val seat: Int? = null)
 @Serializable private data class SeatRequestDto(val id: String, val uid: String)
@@ -101,7 +103,8 @@ class HttpRoomsRepository(
             RoomState(
                 id = d.id, title = d.title, topic = d.topic, ownerUid = d.ownerUid, maxSeats = d.maxSeats,
                 myRole = RoomRole.from(d.myRole), mySeat = d.mySeat,
-                seats = d.seats.map { s -> SeatInfo(s.seat, s.uid, RoomRole.from(s.role)) },
+                seats = d.seats.map { s -> SeatInfo(s.seat, s.uid, RoomRole.from(s.role), s.points) },
+                createdAt = d.createdAt, giftTotal = d.giftTotal,
             )
         }
 

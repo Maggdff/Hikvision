@@ -3,6 +3,7 @@ import type pg from 'pg';
 import type { TokenVerifier } from './auth.js';
 import { HttpError, badRequest } from './errors.js';
 import { EconomyService } from './economy/service.js';
+import { SocialService } from './social/service.js';
 import { RoomService } from './rooms/service.js';
 import type { VoiceProvider } from './voice.js';
 
@@ -49,6 +50,7 @@ export function buildApp(deps?: AppDeps) {
   const rooms = new RoomService(deps.pool, deps.voice, (e) => app.log.error({ err: e }, 'voice sync failed'));
 
   const economy = new EconomyService(deps.pool);
+  const social = new SocialService(deps.pool);
   const admins = new Set(deps.adminUids ?? []);
 
   // كل مسارات /v1 تتطلب Firebase ID Token صالحاً
@@ -107,9 +109,25 @@ export function buildApp(deps?: AppDeps) {
       return economy.grant(req.uid, uidParam(b.uid), b.amount, b.reason, key);
     });
 
-    api.get<{ Querystring: { country?: string } }>('/rooms', async (req) => ({
-      rooms: await rooms.listOpenRooms(50, req.query.country || null),
+    api.get<{ Querystring: { country?: string; scope?: string } }>('/rooms', async (req) => ({
+      rooms: await rooms.listOpenRooms(50, req.query.country || null, req.query.scope === 'following' ? req.uid : null),
     }));
+
+    // المتابعة: متابعة/إلغاء (آمنة للتكرار)، حالتي معه، وعدّادات أي مستخدم
+    api.put<{ Params: { uid: string } }>('/follows/:uid', async (req, reply) => {
+      await social.follow(req.uid, uidParam(req.params.uid));
+      return reply.status(204).send();
+    });
+    api.delete<{ Params: { uid: string } }>('/follows/:uid', async (req, reply) => {
+      await social.unfollow(req.uid, uidParam(req.params.uid));
+      return reply.status(204).send();
+    });
+    api.get<{ Params: { uid: string } }>('/users/:uid/social', async (req) => {
+      const target = uidParam(req.params.uid);
+      const c = await social.counts(target);
+      return { followers: c.followers, followingCount: c.following, iFollow: await social.isFollowing(req.uid, target) };
+    });
+    api.get('/banners', async () => ({ banners: await social.activeBanners() }));
 
     api.get<{ Params: { id: string } }>('/rooms/:id', async (req) =>
       rooms.getRoomState(req.uid, uuidParam(req.params.id)));

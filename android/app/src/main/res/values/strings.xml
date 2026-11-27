@@ -150,4 +150,8 @@
     <string name="account_coins_unavailable">تعذر تحميل الرصيد</string>
     <string name="account_wealth_level">مستوى الثروة</string>
     <string name="account_charm_level">مستوى الجاذبية</string>
+    <string name="room_welcome">مرحباً بك في الغرفة. التزم بآداب الحوار</string>
+    <string name="room_menu">قائمة الغرفة</string>
+    <string name="gift_select">اختر هدية</string>
+    <string name="gift_send">إرسال</string>
 </resources>

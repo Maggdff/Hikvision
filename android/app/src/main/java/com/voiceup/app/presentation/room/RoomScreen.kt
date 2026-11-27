@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -52,6 +53,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.voiceup.app.R
 import com.voiceup.app.domain.model.ChatMessage
@@ -63,6 +65,8 @@ import com.voiceup.app.presentation.errorMessageRes
 import com.voiceup.app.presentation.giftName
 import com.voiceup.app.presentation.theme.VoiceUpColors
 import com.voiceup.app.presentation.theme.appBackground
+
+private data class GiftEffectRequest(val key: Long, val giftId: String, val priceCoins: Int)
 
 private fun rank(r: RoomRole) = when (r) {
     RoomRole.Owner -> 3
@@ -110,9 +114,21 @@ fun RoomScreen(
             end != null -> EndedView(end, onExit)
             room == null || state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             else -> RoomContent(
-                myUid, state, room.title, room.topic, room.maxSeats, room.myRole, room.mySeat, room.seats,
+                myUid, state, room.title, room.maxSeats, room.myRole, room.mySeat, room.seats,
                 onSetMic, onRequestSeat, onLeaveSeat, onLeaveRoom, onClose, onDecide, onMute, onKick,
                 onReconnect, onClearError, onSendMessage, onLoadGifts, onSendGift, onExit,
+            )
+        }
+        // تأثير الهدية فوق المقاعد والدردشة؛ لا يلتقط اللمس
+        var effect by remember { mutableStateOf<GiftEffectRequest?>(null) }
+        LaunchedEffect(state.banner?.messageId) {
+            state.banner?.let { effect = GiftEffectRequest(it.messageId, it.event.giftId, it.event.priceCoins) }
+        }
+        effect?.let { e ->
+            GiftEffect(
+                effectKey = e.key, giftId = e.giftId, priceCoins = e.priceCoins,
+                modifier = Modifier.padding(top = 96.dp, bottom = 76.dp),
+                onFinished = { effect = null },
             )
         }
         state.banner?.let { b ->
@@ -150,7 +166,6 @@ private fun RoomContent(
     myUid: String,
     state: RoomUiState,
     title: String,
-    topic: String?,
     maxSeats: Int,
     myRole: RoomRole,
     mySeat: Int?,
@@ -171,6 +186,7 @@ private fun RoomContent(
     onExit: () -> Unit,
 ) {
     var showGifts by rememberSaveable { mutableStateOf(false) }
+    var showMenu by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     var permissionDenied by remember { mutableStateOf(false) }
     var confirmClose by remember { mutableStateOf(false) }
@@ -193,126 +209,87 @@ private fun RoomContent(
     }
 
     val bySeat = seats.associateBy { it.seat }
+    val room = state.room
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        // الرأس
-        Text(title, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        topic?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                stringResource(
-                    when (state.voice) {
-                        VoiceState.Connecting -> R.string.voice_connecting
-                        VoiceState.Connected -> R.string.voice_connected
-                        VoiceState.Reconnecting -> R.string.voice_reconnecting
-                        VoiceState.Disconnected -> R.string.voice_disconnected
-                        VoiceState.Failed -> R.string.voice_failed
-                    }
-                ),
-                color = if (state.voice == VoiceState.Connected) VoiceUpColors.Mint else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (state.voice == VoiceState.Disconnected || state.voice == VoiceState.Failed) {
-                TextButton(onClick = onReconnect) { Text(stringResource(R.string.room_reconnect)) }
-            }
-        }
+    fun seatClick(seat: SeatInfo?): (() -> Unit)? = when {
+        // مقعد فارغ: من ليس على المنصة يطلب التحدث بلمسه
+        seat == null && mySeat == null && !state.requestPending && !state.busy -> onRequestSeat
+        seat != null && seat.uid != myUid && canModerate(myRole, seat.role) -> ({ target = seat })
+        else -> null
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        RoomTopBar(title, seats.size, state.voice, onExit = { onLeaveRoom(); onExit() }, onReconnect = onReconnect)
+        RoomInfoRow(room?.createdAt.orEmpty(), room?.giftTotal ?: 0L)
 
         state.errorCode?.let {
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(errorMessageRes(it)), color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                Text(stringResource(errorMessageRes(it)), color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.weight(1f))
                 TextButton(onClick = onClearError) { Text(stringResource(R.string.ok)) }
             }
         }
         if (permissionDenied) {
-            Text(stringResource(R.string.room_mic_permission), color = MaterialTheme.colorScheme.error)
+            Text(
+                stringResource(R.string.room_mic_permission), color = MaterialTheme.colorScheme.error, fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 14.dp),
+            )
         }
 
-        // المقاعد
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items((0 until maxSeats).toList()) { index ->
-                val seat = bySeat[index]
-                val name = seat?.let { state.names[it.uid] ?: it.uid.take(6) }
-                val moderatable = seat != null && seat.uid != myUid && canModerate(myRole, seat.role)
-                SeatCell(
-                    name = name,
-                    seedUid = seat?.uid,
-                    role = seat?.role,
-                    speaking = seat != null && seat.uid in state.speaking,
-                    onClick = if (moderatable) ({ target = seat }) else null,
-                )
+        // المضيف: المقعد 0
+        val host = bySeat[0]
+        Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+            HostSeat(
+                name = host?.let { state.names[it.uid] ?: it.uid.take(6) },
+                seed = host?.uid,
+                speaking = host != null && host.uid in state.speaking,
+                points = host?.points ?: 0L,
+                onClick = seatClick(host),
+            )
+        }
+
+        // بقية المقاعد: 4 في كل صف
+        val rest = (1 until maxSeats).toList()
+        Column(Modifier.fillMaxWidth().padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            rest.chunked(4).forEach { rowSeats ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    rowSeats.forEach { index ->
+                        val seat = bySeat[index]
+                        SeatCell(
+                            number = index,
+                            name = seat?.let { state.names[it.uid] ?: it.uid.take(6) },
+                            seed = seat?.uid,
+                            speaking = seat != null && seat.uid in state.speaking,
+                            points = seat?.points ?: 0L,
+                            onClick = seatClick(seat),
+                        )
+                    }
+                    // صف ناقص: نحافظ على المحاذاة بخلايا فارغة
+                    repeat(4 - rowSeats.size) { Box(Modifier.width(82.dp)) }
+                }
             }
         }
 
-        ChatPanel(
+        RoomChat(
             messages = state.messages,
             names = state.names,
             myUid = myUid,
-            sending = state.sending,
-            onSend = onSendMessage,
+            modifier = Modifier.weight(1f).padding(top = 16.dp),
         )
 
-        // طلبات التحدث (للمشرفين)
-        if (myRole.isStaff && state.requests.isNotEmpty()) {
-            Text(stringResource(R.string.room_requests_title), style = MaterialTheme.typography.titleMedium)
-            state.requests.forEach { req ->
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(state.names[req.uid] ?: req.uid.take(6), modifier = Modifier.weight(1f), maxLines = 1)
-                    TextButton(onClick = { onDecide(req.id, true) }, enabled = !state.busy) {
-                        Text(stringResource(R.string.room_approve))
-                    }
-                    TextButton(onClick = { onDecide(req.id, false) }, enabled = !state.busy) {
-                        Text(stringResource(R.string.room_reject))
-                    }
-                }
-            }
-        }
-
-        // أزرار التحكم
-        Row(
-            Modifier.fillMaxWidth().padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (mySeat != null) {
-                Button(onClick = ::toggleMic, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(if (state.micOn) R.string.room_mic_on else R.string.room_mic_off))
-                }
-                if (myRole != RoomRole.Owner) {
-                    OutlinedButton(onClick = onLeaveSeat, enabled = !state.busy) {
-                        Text(stringResource(R.string.room_leave_seat))
-                    }
-                }
-            } else {
-                Button(
-                    onClick = onRequestSeat,
-                    enabled = !state.requestPending && !state.busy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(if (state.requestPending) R.string.room_request_sent else R.string.room_request_seat))
-                }
-            }
-            IconButton(onClick = { showGifts = true }) {
-                Icon(Icons.Rounded.CardGiftcard, contentDescription = stringResource(R.string.gift_title), tint = VoiceUpColors.Coral)
-            }
-            OutlinedButton(onClick = { onLeaveRoom(); onExit() }) { Text(stringResource(R.string.room_leave)) }
-            if (myRole == RoomRole.Owner) {
-                OutlinedButton(onClick = { confirmClose = true }, enabled = !state.busy) {
-                    Text(stringResource(R.string.room_close))
-                }
-            }
-        }
+        RoomBottomBar(
+            sending = state.sending,
+            onSend = onSendMessage,
+            onGift = { showGifts = true },
+            showMic = mySeat != null,
+            micOn = state.micOn,
+            onMic = ::toggleMic,
+            onMenu = { showMenu = true },
+            menuBadge = if (myRole.isStaff) state.requests.size else 0,
+        )
     }
 
     if (showGifts) {
@@ -323,6 +300,21 @@ private fun RoomContent(
             onLoad = onLoadGifts,
             onSend = onSendGift,
             onDismiss = { showGifts = false },
+        )
+    }
+
+    if (showMenu) {
+        RoomMenuSheet(
+            state = state,
+            myRole = myRole,
+            mySeat = mySeat,
+            onDismiss = { showMenu = false },
+            onRequestSeat = { showMenu = false; onRequestSeat() },
+            onLeaveSeat = { showMenu = false; onLeaveSeat() },
+            onReconnect = { showMenu = false; onReconnect() },
+            onDecide = onDecide,
+            onLeaveRoom = { showMenu = false; onLeaveRoom(); onExit() },
+            onClose = { showMenu = false; confirmClose = true },
         )
     }
 
@@ -362,118 +354,64 @@ private fun RoomContent(
     }
 }
 
+/** قائمة الغرفة (زر الشبكة): كل بنودها تعمل فعلاً حسب دور المستخدم وحالته. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun SeatCell(name: String?, seedUid: String?, role: RoomRole?, speaking: Boolean, onClick: (() -> Unit)?) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(if (name == null) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant)
-                .border(
-                    width = if (speaking) 3.dp else 1.dp,
-                    color = if (speaking) VoiceUpColors.Mint else MaterialTheme.colorScheme.surfaceVariant,
-                    shape = CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (name != null) {
-                Avatar(name = name, seed = seedUid ?: name, size = 64.dp)
+private fun RoomMenuSheet(
+    state: RoomUiState,
+    myRole: RoomRole,
+    mySeat: Int?,
+    onDismiss: () -> Unit,
+    onRequestSeat: () -> Unit,
+    onLeaveSeat: () -> Unit,
+    onReconnect: () -> Unit,
+    onDecide: (String, Boolean) -> Unit,
+    onLeaveRoom: () -> Unit,
+    onClose: () -> Unit,
+) {
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.room_menu), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+            if (mySeat == null) {
+                MenuRow(
+                    stringResource(if (state.requestPending) R.string.room_request_sent else R.string.room_request_seat),
+                    enabled = !state.requestPending && !state.busy, onClick = onRequestSeat,
+                )
+            } else if (myRole != RoomRole.Owner) {
+                MenuRow(stringResource(R.string.room_leave_seat), enabled = !state.busy, onClick = onLeaveSeat)
             }
-        }
-        Text(
-            text = name ?: stringResource(R.string.seat_empty),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (name == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (role == RoomRole.Owner || role == RoomRole.Moderator) {
-            Text(
-                stringResource(if (role == RoomRole.Owner) R.string.role_owner else R.string.role_moderator),
-                style = MaterialTheme.typography.labelSmall,
-                color = VoiceUpColors.Coral,
-            )
+            if (state.voice == VoiceState.Disconnected || state.voice == VoiceState.Failed) {
+                MenuRow(stringResource(R.string.room_reconnect), onClick = onReconnect)
+            }
+            if (myRole.isStaff && state.requests.isNotEmpty()) {
+                Text(stringResource(R.string.room_requests_title), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                state.requests.forEach { req ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(state.names[req.uid] ?: req.uid.take(6), modifier = Modifier.weight(1f), maxLines = 1)
+                        TextButton(onClick = { onDecide(req.id, true) }, enabled = !state.busy) { Text(stringResource(R.string.room_approve)) }
+                        TextButton(onClick = { onDecide(req.id, false) }, enabled = !state.busy) { Text(stringResource(R.string.room_reject)) }
+                    }
+                }
+            }
+            MenuRow(stringResource(R.string.room_leave), onClick = onLeaveRoom)
+            if (myRole == RoomRole.Owner) {
+                MenuRow(stringResource(R.string.room_close), enabled = !state.busy, danger = true, onClick = onClose)
+            }
         }
     }
 }
 
 @Composable
-private fun ChatPanel(
-    messages: List<ChatMessage>,
-    names: Map<String, String>,
-    myUid: String,
-    sending: Boolean,
-    onSend: (String, () -> Unit) -> Unit,
-) {
-    var draft by rememberSaveable { mutableStateOf("") }
-    val listState = rememberLazyListState()
-    LaunchedEffect(messages.lastOrNull()?.id) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
-    }
-
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(130.dp)
-                .background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-        ) {
-            if (messages.isEmpty()) {
-                item {
-                    Text(
-                        stringResource(R.string.chat_empty),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-            items(messages, key = { it.id }) { m ->
-                val name = if (m.uid == myUid) stringResource(R.string.chat_me) else (names[m.uid] ?: m.uid.take(6))
-                val gift = m.gift
-                if (gift != null) {
-                    val to = if (gift.recipientUid == myUid) stringResource(R.string.chat_me) else (names[gift.recipientUid] ?: gift.recipientUid.take(6))
-                    Text(
-                        text = stringResource(R.string.chat_gift, name, to, giftName(gift.nameAr, gift.nameEn)),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = VoiceUpColors.Orange,
-                        modifier = Modifier.padding(vertical = 2.dp),
-                    )
-                } else {
-                    Text(
-                        text = "$name: ${m.body}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (m.uid == myUid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(vertical = 2.dp),
-                    )
-                }
-            }
-        }
-        Row(
-            Modifier.fillMaxWidth().padding(top = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it.take(300) },
-                placeholder = { Text(stringResource(R.string.chat_hint)) },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            Button(
-                onClick = { onSend(draft) { draft = "" } },
-                enabled = draft.isNotBlank() && !sending,
-            ) { Text(stringResource(R.string.chat_send)) }
-        }
-    }
+private fun MenuRow(text: String, enabled: Boolean = true, danger: Boolean = false, onClick: () -> Unit) {
+    Text(
+        text,
+        color = when {
+            !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+            danger -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.onSurface
+        },
+        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(vertical = 14.dp),
+    )
 }
 
 /** إشعار هدية حيّ أعلى الغرفة؛ يختفي تلقائياً بعد ثوانٍ. */

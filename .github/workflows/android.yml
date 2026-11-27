@@ -1,48 +1,33 @@
-
 name: Android CI
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'android/**'
-      - '.github/workflows/android.yml'
-
+    paths: ['android/**', '.github/workflows/android.yml']
   pull_request:
-    paths:
-      - 'android/**'
-      - '.github/workflows/android.yml'
-
+    paths: ['android/**', '.github/workflows/android.yml']
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-
     env:
       VOICEUP_API_URL: ${{ vars.VOICEUP_API_URL }}
-
     defaults:
       run:
         working-directory: android
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
 
+      # google-services.json يأتي من سر GitHub (Base64)، ولا يُرفع إلى المستودع
       - name: Restore Firebase config
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
@@ -51,6 +36,7 @@ jobs:
             echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
           fi
 
+      # مفتاح debug ثابت من سر GitHub لتبقى بصمة SHA-1 نفسها في كل بناء
       - name: Restore debug keystore
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
@@ -59,6 +45,7 @@ jobs:
             echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > app/debug.keystore
           fi
 
+      # الرفع عبر ZIP قد يُسقط صلاحية التنفيذ فيظهر الخطأ 126
       - name: Make gradlew executable
         run: chmod +x gradlew
 
@@ -71,9 +58,7 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: voiceup-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error

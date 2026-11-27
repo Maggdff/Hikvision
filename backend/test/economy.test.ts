@@ -139,6 +139,12 @@ d('economy: wallet, gifts, ledger (Postgres)', () => {
 
     const s = await sums();
     expect(s.d).toBe(s.c);
+
+    // حالة الغرفة تعرض قيمة الهدايا المستلمة لكل جالس ومجموع الغرفة
+    const st = (await call(fan, 'GET', `/rooms/${id}`)).json();
+    expect(st.giftTotal).toBe(500);
+    expect(st.seats.find((x: { uid: string }) => x.uid === 'uid-owner').points).toBe(500);
+    expect(typeof st.createdAt).toBe('string');
   });
 
   it('the same idempotency key never charges twice', async () => {

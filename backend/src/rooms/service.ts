@@ -128,7 +128,7 @@ export class RoomService {
     topic: string | null,
     country: string | null = null,
     password: string | null = null,
-    maxSeats = 8,
+    maxSeats = 9,
   ): Promise<RoomSummary> {
     const cleanTitle = title.trim();
     if (cleanTitle.length < 3 || cleanTitle.length > 60) throw badRequest('invalid_title');
@@ -167,15 +167,17 @@ export class RoomService {
     }
   }
 
-  async listOpenRooms(limit = 50, country: string | null = null): Promise<RoomSummary[]> {
+  /** followedBy: يقتصر على غرف من يتابعهم هذا المستخدم. */
+  async listOpenRooms(limit = 50, country: string | null = null, followedBy: string | null = null): Promise<RoomSummary[]> {
     const cc = country ? country.trim().toUpperCase() : null;
     if (cc && !isSupportedCountry(cc)) throw badRequest('invalid_country');
     const r = await this.pool.query(
       `SELECT r.id, r.title, r.topic, r.owner_uid, r.max_seats, r.country, r.created_at, (r.password_hash IS NOT NULL) AS is_private,
               (SELECT count(*) FROM room_seats s WHERE s.room_id = r.id)::int AS seated
          FROM rooms r WHERE r.status = 'open' AND ($2::text IS NULL OR r.country = $2)
+          AND ($3::text IS NULL OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_uid = $3 AND f.followee_uid = r.owner_uid))
          ORDER BY r.created_at DESC LIMIT $1`,
-      [Math.min(Math.max(limit, 1), 100), cc],
+      [Math.min(Math.max(limit, 1), 100), cc, followedBy],
     );
     return r.rows.map((x) => ({
       id: x.id,
@@ -193,7 +195,7 @@ export class RoomService {
   /** حالة الغرفة للعرض: المقاعد وأدوار أصحابها، مع دور المستدعي. لا تكشف أي بيانات خاصة. */
   async getRoomState(uid: string, roomId: string) {
     const room = await this.pool.query(
-      `SELECT id, title, topic, owner_uid, max_seats, (password_hash IS NOT NULL) AS is_private
+      `SELECT id, title, topic, owner_uid, max_seats, created_at, (password_hash IS NOT NULL) AS is_private
          FROM rooms WHERE id = $1 AND status = 'open'`,
       [roomId],
     );
@@ -206,6 +208,13 @@ export class RoomService {
         WHERE s.room_id = $1 ORDER BY s.seat_no`,
       [roomId],
     );
+    // قيمة الهدايا المستلمة داخل هذه الغرفة لكل مستلم (من سجل الهدايا الفعلي)
+    const pts = await this.pool.query(
+      `SELECT recipient_uid, SUM(price_coins)::bigint AS pts FROM room_gifts WHERE room_id = $1 GROUP BY recipient_uid`,
+      [roomId],
+    );
+    const points = new Map<string, number>(pts.rows.map((x) => [x.recipient_uid as string, Number(x.pts)]));
+    const giftTotal = [...points.values()].reduce((a, b) => a + b, 0);
     const myRole = await this.roleOf(this.pool, roomId, uid);
     const mine = seats.rows.find((x) => x.uid === uid);
     return {
@@ -216,7 +225,11 @@ export class RoomService {
       maxSeats: room.rows[0].max_seats as number,
       myRole,
       mySeat: (mine?.seat_no as number | undefined) ?? null,
-      seats: seats.rows.map((x) => ({ seat: x.seat_no as number, uid: x.uid as string, role: x.role as Role })),
+      createdAt: (room.rows[0].created_at as Date).toISOString(),
+      giftTotal,
+      seats: seats.rows.map((x) => ({
+        seat: x.seat_no as number, uid: x.uid as string, role: x.role as Role, points: points.get(x.uid as string) ?? 0,
+      })),
     };
   }
 

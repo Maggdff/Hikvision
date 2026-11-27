@@ -27,7 +27,8 @@ enum class RoomRole {
     }
 }
 
-data class SeatInfo(val seat: Int, val uid: String, val role: RoomRole)
+/** points: قيمة الهدايا التي استلمها هذا الجالس داخل الغرفة (من الخادم). */
+data class SeatInfo(val seat: Int, val uid: String, val role: RoomRole, val points: Long = 0)
 
 data class RoomState(
     val id: String,
@@ -38,6 +39,10 @@ data class RoomState(
     val myRole: RoomRole,
     val mySeat: Int?,
     val seats: List<SeatInfo>,
+    /** وقت إنشاء الغرفة ISO-8601 لعدّاد المدة؛ فارغ إن لم يصل. */
+    val createdAt: String = "",
+    /** مجموع قيمة الهدايا المرسلة داخل الغرفة. */
+    val giftTotal: Long = 0,
 )
 
 /** تفاصيل رسالة هدية داخل مجرى الدردشة. */
