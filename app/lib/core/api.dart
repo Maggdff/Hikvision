@@ -56,7 +56,7 @@ class Api {
       final req = await _client.openUrl(method, _uri(path)).timeout(const Duration(seconds: 20));
       (await _headers(idemKey: idemKey)).forEach(req.headers.set);
       if (body != null) req.add(utf8.encode(jsonEncode(body)));
-      final res = await (await req.close()).timeout(const Duration(seconds: 20));
+      final res = await req.close().timeout(const Duration(seconds: 20));
       final text = await res.transform(utf8.decoder).join();
       if (res.statusCode >= 200 && res.statusCode < 300) {
         if (text.isEmpty) return null;
@@ -79,7 +79,7 @@ class Api {
   Future<dynamic> get(String path) => _send('GET', path);
   Future<dynamic> post(String path, {Object? body, String? idemKey}) =>
       _send('POST', path, body: body ?? const {}, idemKey: idemKey);
-  Future<dynamic> put(String path) => _send('PUT', path);
+  Future<dynamic> put(String path, {Object? body}) => _send('PUT', path, body: body);
   Future<dynamic> delete(String path) => _send('DELETE', path);
 
   static String newKey() {
