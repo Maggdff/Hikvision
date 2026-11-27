@@ -20,6 +20,10 @@ dependencies:
   livekit_client: ^2.1.0
   svgaplayer_flutter: ^2.2.0
 
+# svgaplayer_flutter يطلب http ^0.13 بينما google_fonts يطلب ^1؛ SVGA لا تستخدمه عندنا (نحمّل من الأصول)
+dependency_overrides:
+  http: ^1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
