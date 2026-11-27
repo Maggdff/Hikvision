@@ -54,7 +54,10 @@ class _Reader {
     switch (wire) {
       case 0: varint(); break;
       case 1: i += 8; break;
-      case 2: i += varint(); break;
+      case 2:
+        final n = varint();
+        i += n;
+        break;
       case 5: i += 4; break;
       default: throw const FormatException('wire type غير مدعوم');
     }
