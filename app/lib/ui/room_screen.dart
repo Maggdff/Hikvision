@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
+import '../core/catalog.dart';
 import '../core/colors.dart';
 import '../core/icons.dart';
 import '../core/models.dart';
@@ -79,6 +80,7 @@ class _RoomScreenState extends State<RoomScreen> {
       final s = RoomState.fromJson(await Api.i.get('/rooms/${widget.roomId}') as Map);
       for (final seat in s.seats) {
         Profiles.get(seat.uid).then((_) => mounted ? setState(() {}) : null);
+        if (seat.frame != null) Catalog.refreshIfMissing(frameId: seat.frame);
       }
       Profiles.get(s.ownerUid).then((_) => mounted ? setState(() {}) : null);
       if (mounted) setState(() => state = s);
@@ -127,7 +129,10 @@ class _RoomScreenState extends State<RoomScreen> {
         if (m.id > lastMsgId) lastMsgId = m.id;
         if (m.kind == 'gift' && !firstLoad) {
           final gid = m.meta?['giftId'] as String?;
-          if (gid != null && m.uid != me) _playEffect(Gift.fromJson({'id': gid, 'nameAr': m.meta?['nameAr'] ?? '', 'tier': _tierOf((m.meta?['priceCoins'] ?? 0) as int), 'priceCoins': m.meta?['priceCoins'] ?? 0}), m.uid);
+          if (gid != null && m.uid != me) {
+            await Catalog.refreshIfMissing(giftId: gid);
+            _playEffect(Gift.fromJson({'id': gid, 'nameAr': m.meta?['nameAr'] ?? '', 'tier': _tierOf((m.meta?['priceCoins'] ?? 0) as int), 'priceCoins': m.meta?['priceCoins'] ?? 0}), m.uid);
+          }
         }
       }
       setState(() => messages.addAll(fresh));

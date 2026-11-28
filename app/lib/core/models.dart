@@ -67,8 +67,11 @@ class JoinInfo {
 class Gift {
   final String id, nameAr, nameEn, tier;
   final int priceCoins;
+  final String? iconUrl, effectUrl;
   Gift.fromJson(Map j)
-      : id = j['id'] as String,
+      : iconUrl = j['iconUrl'] as String?,
+        effectUrl = j['effectUrl'] as String?,
+        id = j['id'] as String,
         nameAr = j['nameAr'] as String,
         nameEn = (j['nameEn'] ?? '') as String,
         tier = (j['tier'] ?? 'small') as String,
@@ -128,8 +131,10 @@ class FrameItem {
   final String id, nameAr;
   final int priceCoins;
   final bool owned, equipped;
+  final String? assetUrl;
   FrameItem.fromJson(Map j)
-      : id = j['id'] as String,
+      : assetUrl = j['assetUrl'] as String?,
+        id = j['id'] as String,
         nameAr = j['nameAr'] as String,
         priceCoins = (j['priceCoins'] as num).toInt(),
         owned = (j['owned'] ?? false) as bool,

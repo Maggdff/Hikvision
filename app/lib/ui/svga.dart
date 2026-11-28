@@ -4,13 +4,9 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/foundation.dart' show compute;
 
-/// ملفات SVGA المضمّنة. المفتاح هو المعرّف القادم من الخادم (frames.id / gifts.id).
-class SvgaAssets {
-  static const frames = <String, String>{'vip6': 'assets/svga/vip6_frame.svga'};
-  static const gifts = <String, String>{'bugatti': 'assets/svga/bugatti_gift.svga'};
-}
+import '../core/assets.dart';
 
 // ───────────────────────── محلّل SVGA 2.x (protobuf + zlib) ─────────────────────────
 
@@ -75,10 +71,19 @@ class SvgaMovie {
   Duration get duration => Duration(milliseconds: (frameCount * 1000 / fps).round());
 
   static final Map<String, Future<SvgaMovie>> _cache = {};
-  static Future<SvgaMovie> loadAsset(String asset) => _cache.putIfAbsent(asset, () async {
-        final data = await rootBundle.load(asset);
-        return parse(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes));
-      });
+
+  /// يحمّل الملف من الرابط (قرص ثم شبكة) ويحلّله في isolate منفصل. الإطارات تُخزَّن في الذاكرة؛ الهدايا لا (كبيرة).
+  static Future<SvgaMovie> loadUrl(String url, {bool keep = true}) {
+    Future<SvgaMovie> run() async {
+      final bytes = await RemoteAssets.bytes(url);
+      return compute(parse, bytes);
+    }
+
+    if (!keep) return run();
+    final f = _cache.putIfAbsent(url, run);
+    f.then((_) {}, onError: (_) => _cache.remove(url)); // اسمح بإعادة المحاولة لاحقاً
+    return f;
+  }
 
   static SvgaMovie parse(Uint8List fileBytes) {
     final raw = Uint8List.fromList(ZLibCodec().decode(fileBytes));
@@ -213,11 +218,12 @@ class _FrameData {
 /// تشغيل SVGA بحركته وشفافيته الأصلية: متكرر (إطارات) أو مرة واحدة (هدايا).
 /// تُفك صور الإطارات القريبة فقط (نافذة صغيرة) فلا تتضخم الذاكرة.
 class SvgaView extends StatefulWidget {
-  final String asset;
+  /// رابط ملف SVGA على CDN.
+  final String url;
   final bool loop;
   final BoxFit fit;
   final VoidCallback? onFinished;
-  const SvgaView({super.key, required this.asset, this.loop = true, this.fit = BoxFit.contain, this.onFinished});
+  const SvgaView({super.key, required this.url, this.loop = true, this.fit = BoxFit.contain, this.onFinished});
 
   @override
   State<SvgaView> createState() => _SvgaViewState();
@@ -239,7 +245,7 @@ class _SvgaViewState extends State<SvgaView> with SingleTickerProviderStateMixin
 
   Future<void> _start() async {
     try {
-      final m = await SvgaMovie.loadAsset(widget.asset);
+      final m = await SvgaMovie.loadUrl(widget.url, keep: widget.loop);
       if (_disposed) return;
       _movie = m;
       final c = AnimationController(vsync: this, duration: m.duration);

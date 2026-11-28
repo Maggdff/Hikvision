@@ -6,6 +6,7 @@ import '../core/api.dart';
 import '../core/colors.dart';
 import '../core/icons.dart';
 import '../core/models.dart';
+import 'admin_catalog_screen.dart';
 import 'store_screen.dart';
 import 'widgets.dart';
 
@@ -205,6 +206,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       if (isAdmin) ...[
                         const SizedBox(height: 8),
                         _row(Ic.gift, 'عملات تجريبية (50,000)', onTap: _testCoins),
+                        const SizedBox(height: 8),
+                        _row(Ic.settings, 'إدارة الهدايا والإطارات', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminCatalogScreen()))),
                       ],
                       const SizedBox(height: 8),
                       _row(Ic.power, 'تسجيل الخروج', onTap: _signOut),

@@ -3,6 +3,7 @@ import type pg from 'pg';
 import type { TokenVerifier } from './auth.js';
 import { HttpError, badRequest } from './errors.js';
 import { EconomyService } from './economy/service.js';
+import { CatalogService } from './catalog/service.js';
 import { SocialService } from './social/service.js';
 import { RoomService } from './rooms/service.js';
 import type { VoiceProvider } from './voice.js';
@@ -13,6 +14,8 @@ export interface AppDeps {
   voice: VoiceProvider;
   /** معرّفات Firebase لمشرفي النظام (يمنحون عملات ترويجية). فارغة = لا مشرفين. */
   adminUids?: string[];
+  /** أساس روابط أصول الهدايا/الإطارات (Cloudflare R2/CDN)، مثل https://cdn.example.com */
+  assetsBaseUrl?: string;
 }
 
 declare module 'fastify' {
@@ -51,6 +54,7 @@ export function buildApp(deps?: AppDeps) {
 
   const economy = new EconomyService(deps.pool);
   const social = new SocialService(deps.pool);
+  const catalog = new CatalogService(deps.pool, deps.assetsBaseUrl ?? '');
   const admins = new Set(deps.adminUids ?? []);
 
   // كل مسارات /v1 تتطلب Firebase ID Token صالحاً
@@ -88,7 +92,23 @@ export function buildApp(deps?: AppDeps) {
     api.get('/levels', async (req) => economy.getLevels(req.uid));
     api.get<{ Params: { uid: string } }>('/users/:uid/levels', async (req) => economy.getLevels(uidParam(req.params.uid)));
 
-    api.get('/gifts', async () => ({ gifts: await economy.listGifts() }));
+    api.get('/gifts', async () => ({ gifts: (await catalog.publicCatalog()).gifts }));
+    // كتالوج عام بروابط الأصول (للأجهزة لتحميل أيقونات الهدايا وتأثيراتها وإطاراتها من CDN)
+    api.get('/catalog', async () => catalog.publicCatalog());
+
+    // إدارة الكتالوج: مشرفون فقط
+    const adminOnly = (uid: string) => { if (!admins.has(uid)) throw new HttpError(403, 'admin_only'); };
+    api.get('/admin/catalog', async (req) => { adminOnly(req.uid); return catalog.adminCatalog(); });
+    api.put<{ Params: { id: string } }>('/admin/gifts/:id', async (req, reply) => {
+      adminOnly(req.uid);
+      await catalog.upsertGift(req.params.id, (req.body ?? {}) as Record<string, unknown>);
+      return reply.status(204).send();
+    });
+    api.put<{ Params: { id: string } }>('/admin/frames/:id', async (req, reply) => {
+      adminOnly(req.uid);
+      await catalog.upsertFrame(req.params.id, (req.body ?? {}) as Record<string, unknown>);
+      return reply.status(204).send();
+    });
 
     api.post<{ Params: { id: string } }>('/rooms/:id/gifts', async (req) => {
       const b = (req.body ?? {}) as { giftId?: unknown; recipientUid?: unknown };
@@ -128,7 +148,11 @@ export function buildApp(deps?: AppDeps) {
       return { followers: c.followers, followingCount: c.following, iFollow: await social.isFollowing(req.uid, target), frame: await economy.frameOf(target) };
     });
     // المتجر: الإطارات المتحركة (SVGA). الشراء عبر الدفتر، والتفعيل لما يملكه المستخدم فقط
-    api.get('/store/frames', async (req) => ({ frames: await economy.listFrames(req.uid) }));
+    api.get('/store/frames', async (req) => {
+      const urls = new Map((await catalog.publicCatalog()).frames.map((f) => [f.id, f.assetUrl]));
+      const mine = await economy.listFrames(req.uid);
+      return { frames: mine.map((f) => ({ ...f, assetUrl: urls.get(f.id) ?? null })) };
+    });
     api.post<{ Params: { id: string } }>('/store/frames/:id/buy', async (req) => {
       const key = req.headers['idempotency-key'];
       if (typeof key !== 'string') throw badRequest('invalid_request');

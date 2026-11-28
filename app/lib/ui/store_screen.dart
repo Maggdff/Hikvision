@@ -97,14 +97,14 @@ class _StoreScreenState extends State<StoreScreen> {
       itemCount: frames!.length,
       itemBuilder: (_, i) {
         final f = frames![i];
-        final asset = SvgaAssets.frames[f.id];
+        final asset = f.assetUrl;
         final busy = busyId == f.id;
         final label = !f.owned ? 'شراء' : (f.equipped ? 'إزالة' : 'تفعيل');
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(18), border: Border.all(color: C.line)),
           child: Column(children: [
-            Expanded(child: asset == null ? const SizedBox() : SvgaView(asset: asset)),
+            Expanded(child: asset == null ? const SizedBox() : SvgaView(url: asset)),
             const SizedBox(height: 8),
             Text(f.nameAr, style: plex(13, w: FontWeight.w500)),
             const SizedBox(height: 6),

@@ -5,6 +5,7 @@ import '../core/colors.dart';
 import '../core/icons.dart';
 import '../core/models.dart';
 import '../core/profiles.dart';
+import '../core/catalog.dart';
 import 'svga.dart';
 import 'widgets.dart';
 
@@ -169,8 +170,12 @@ class _GiftSheetState extends State<GiftSheet> {
                 width: 56, height: 56,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: C.surface2, borderRadius: BorderRadius.circular(16)),
-                child: g.id == 'bugatti'
-                    ? ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.asset('assets/gifts/bugatti.webp', width: 56, height: 56, fit: BoxFit.cover))
+                child: g.iconUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.network(g.iconUrl!, width: 56, height: 56, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icn(Ic.forGift(g.id), size: 30, color: C.amber, sw: 1.5)),
+                      )
                     : Icn(Ic.forGift(g.id), size: 30, color: C.amber, sw: 1.5),
               ),
               const SizedBox(height: 8),
@@ -201,7 +206,7 @@ class GiftEffect extends StatefulWidget {
 class _GiftEffectState extends State<GiftEffect> with SingleTickerProviderStateMixin {
   AnimationController? c;
 
-  String? get _svga => SvgaAssets.gifts[widget.gift.id];
+  String? get _svga => widget.gift.effectUrl ?? Catalog.effectUrl(widget.gift.id);
 
   @override
   void initState() {
@@ -225,7 +230,7 @@ class _GiftEffectState extends State<GiftEffect> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final svga = _svga;
     if (svga != null) {
-      return IgnorePointer(child: SvgaView(asset: svga, loop: false, fit: BoxFit.contain, onFinished: widget.onDone));
+      return IgnorePointer(child: SvgaView(url: svga, loop: false, fit: BoxFit.contain, onFinished: widget.onDone));
     }
     final big = widget.gift.tier == 'large' ? 150.0 : widget.gift.tier == 'medium' ? 110.0 : 76.0;
     return IgnorePointer(

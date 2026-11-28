@@ -24,6 +24,7 @@ const app = buildApp({
   pool,
   verifier: new FirebaseTokenVerifier(required('FIREBASE_PROJECT_ID')),
   voice: new LiveKitProvider(required('LIVEKIT_URL'), required('LIVEKIT_API_KEY'), required('LIVEKIT_API_SECRET')),
+  assetsBaseUrl: process.env.ASSETS_BASE_URL ?? '',
   adminUids: (process.env.ADMIN_UIDS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
 });
 

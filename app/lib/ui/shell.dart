@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/catalog.dart';
 import '../core/colors.dart';
 import '../core/icons.dart';
 import 'home_screen.dart';
@@ -15,6 +16,12 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   int tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    Catalog.load();
+  }
 
   Widget _item(int i, String icon, String label) {
     final on = tab == i;

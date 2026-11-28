@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../core/colors.dart';
+import '../core/catalog.dart';
 import 'svga.dart';
 
 TextStyle kufi(double size, {FontWeight w = FontWeight.w600, Color color = C.cream, double? height}) =>
@@ -22,9 +23,16 @@ class Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (frame == null) return _build(null);
+    return ValueListenableBuilder<int>(
+      valueListenable: Catalog.rev,
+      builder: (_, __, ___) => _build(Catalog.frameUrl(frame!)),
+    );
+  }
+
+  Widget _build(String? frameAsset) {
     final p = C.paletteFor(key2);
     final letter = name.trim().isEmpty ? '؟' : String.fromCharCode(name.trim().runes.first);
-    final frameAsset = frame == null ? null : SvgaAssets.frames[frame];
     return SizedBox(
       width: size,
       height: size,
@@ -47,7 +55,7 @@ class Avatar extends StatelessWidget {
         if (frameAsset != null)
           Positioned(
             left: -size * 0.35, top: -size * 0.35, width: size * 1.7, height: size * 1.7,
-            child: IgnorePointer(child: SvgaView(asset: frameAsset)),
+            child: IgnorePointer(child: SvgaView(url: frameAsset)),
           ),
       ]),
     );
