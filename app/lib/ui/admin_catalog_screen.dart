@@ -49,7 +49,7 @@ class _AdminCatalogScreenState extends State<AdminCatalogScreen> {
     final price = TextEditingController(text: '${item?['priceCoins'] ?? ''}');
     final sort = TextEditingController(text: '${item?['sortOrder'] ?? 0}');
     final icon = TextEditingController(text: str(item?['iconPath']));
-    final effect = TextEditingController(text: str(isGift ? item?['effectPath'] : item?['assetPath']));
+    final effect = TextEditingController(text: str(item == null ? null : (isGift ? item['effectPath'] : item['assetPath'])));
     var tier = (item?['tier'] as String?) ?? 'small';
     var active = (item?['active'] as bool?) ?? true;
 
