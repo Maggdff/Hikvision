@@ -1,0 +1,58 @@
+name: Make SVGA
+
+# تشغيل يدوي: Actions ← Make SVGA ← Run workflow
+on:
+  workflow_dispatch:
+    inputs:
+      input:
+        description: 'مسار الفيديو/GIF داخل المستودع (مثل inbox/crown.mp4) أو مجلد صور PNG'
+        required: true
+      output:
+        description: 'مسار ملف SVGA الناتج (مثل gifts/crown.svga أو frames/vip7.svga)'
+        required: true
+      kind:
+        description: 'النوع'
+        type: choice
+        options: [gift, frame]
+        default: gift
+      key:
+        description: 'المفتاح: black (توهج) / green (خلفية خضراء) / none (PNG بشفافية) / #RRGGBB'
+        default: black
+      hole:
+        description: 'للإطارات: قطر الفتحة المركزية الشفافة (0.58 مناسب). للهدايا اتركه 0'
+        default: '0'
+      max_frames:
+        description: 'أقصى عدد إطارات'
+        default: '130'
+
+permissions:
+  contents: write
+
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install tools
+        run: |
+          pip install pillow numpy
+          which ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+      - name: Convert
+        run: |
+          python make_svga.py "${{ inputs.input }}" "${{ inputs.output }}" \
+            --kind "${{ inputs.kind }}" --key "${{ inputs.key }}" \
+            --hole "${{ inputs.hole }}" --max-frames "${{ inputs.max_frames }}"
+      - name: Commit result
+        run: |
+          git config user.name "svga-maker"
+          git config user.email "svga-maker@users.noreply.github.com"
+          git add "${{ inputs.output }}" "${{ inputs.output }}.preview.png"
+          git commit -m "svga: ${{ inputs.output }}"
+          git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview
+          path: ${{ inputs.output }}.preview.png
