@@ -42,13 +42,14 @@ class _AdminCatalogScreenState extends State<AdminCatalogScreen> {
 
   Future<void> _edit({required bool isGift, Map? item}) async {
     final isNew = item == null;
-    final id = TextEditingController(text: item?['id'] as String? ?? '');
-    final ar = TextEditingController(text: item?['nameAr'] as String? ?? '');
-    final en = TextEditingController(text: item?['nameEn'] as String? ?? '');
+    String str(Object? v) => (v as String?) ?? '';
+    final id = TextEditingController(text: str(item?['id']));
+    final ar = TextEditingController(text: str(item?['nameAr']));
+    final en = TextEditingController(text: str(item?['nameEn']));
     final price = TextEditingController(text: '${item?['priceCoins'] ?? ''}');
     final sort = TextEditingController(text: '${item?['sortOrder'] ?? 0}');
-    final icon = TextEditingController(text: item?['iconPath'] as String? ?? '');
-    final effect = TextEditingController(text: (isGift ? item?['effectPath'] : item?['assetPath']) as String? ?? '');
+    final icon = TextEditingController(text: str(item?['iconPath']));
+    final effect = TextEditingController(text: str(isGift ? item?['effectPath'] : item?['assetPath']));
     var tier = (item?['tier'] as String?) ?? 'small';
     var active = (item?['active'] as bool?) ?? true;
 
